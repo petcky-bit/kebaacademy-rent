@@ -117,3 +117,4 @@ curl http://localhost:3000
 npm run build
 wrangler pages deploy dist --project-name webapp
 ```
+## 배포 시간: Sun Aug 17 10:18:12 UTC 2025
