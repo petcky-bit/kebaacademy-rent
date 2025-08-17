@@ -4,6 +4,13 @@ import { serveStatic } from 'hono/cloudflare-workers'
 
 const app = new Hono()
 
+// 메모리 스토리지 (실제 환경에서는 D1 데이터베이스 사용 권장)
+let applications: any[] = []
+let applicationIdCounter = 1
+
+// 관리자 비밀번호 (실제 환경에서는 환경변수 사용)
+const ADMIN_PASSWORD = 'admin123'
+
 // CORS 설정
 app.use('/api/*', cors())
 
@@ -39,12 +46,24 @@ app.post('/api/application', async (c) => {
 주소: 경기도 광명시 일직로 43, GIDC C동 1705호
     `;
     
+    // 신청 데이터 저장
+    const application = {
+      id: applicationIdCounter++,
+      ...formData,
+      status: 'pending',
+      submittedAt: new Date().toISOString(),
+      emailContent
+    }
+    applications.push(application)
+    
     // 실제 메일 발송은 여기에 구현
     console.log('Email would be sent:', emailContent)
+    console.log('Application saved:', application)
     
     return c.json({ 
       success: true, 
-      message: '대관신청이 성공적으로 접수되었습니다. 확인 메일을 발송했습니다.' 
+      message: '대관신청이 성공적으로 접수되었습니다. 확인 메일을 발송했습니다.',
+      applicationId: application.id
     })
   } catch (error) {
     console.error('Application submission error:', error)
@@ -53,6 +72,409 @@ app.post('/api/application', async (c) => {
       message: '신청 처리 중 오류가 발생했습니다. 다시 시도해주세요.' 
     }, 500)
   }
+})
+
+// 관리자 로그인 API
+app.post('/api/admin/login', async (c) => {
+  try {
+    const { password } = await c.req.json()
+    
+    if (password === ADMIN_PASSWORD) {
+      return c.json({ success: true, message: '로그인 성공' })
+    } else {
+      return c.json({ success: false, message: '비밀번호가 틀렸습니다.' }, 401)
+    }
+  } catch (error) {
+    return c.json({ success: false, message: '로그인 처리 중 오류가 발생했습니다.' }, 500)
+  }
+})
+
+// 관리자 신청 목록 조회 API
+app.get('/api/admin/applications', async (c) => {
+  const password = c.req.header('Authorization')?.replace('Bearer ', '')
+  
+  if (password !== ADMIN_PASSWORD) {
+    return c.json({ success: false, message: '인증이 필요합니다.' }, 401)
+  }
+  
+  return c.json({ 
+    success: true, 
+    applications: applications.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()) 
+  })
+})
+
+// 관리자 신청 상태 업데이트 API
+app.put('/api/admin/applications/:id/status', async (c) => {
+  const password = c.req.header('Authorization')?.replace('Bearer ', '')
+  
+  if (password !== ADMIN_PASSWORD) {
+    return c.json({ success: false, message: '인증이 필요합니다.' }, 401)
+  }
+  
+  try {
+    const id = parseInt(c.req.param('id'))
+    const { status, notes } = await c.req.json()
+    
+    const applicationIndex = applications.findIndex(app => app.id === id)
+    if (applicationIndex === -1) {
+      return c.json({ success: false, message: '신청을 찾을 수 없습니다.' }, 404)
+    }
+    
+    applications[applicationIndex] = {
+      ...applications[applicationIndex],
+      status,
+      adminNotes: notes,
+      updatedAt: new Date().toISOString()
+    }
+    
+    return c.json({ 
+      success: true, 
+      message: '상태가 업데이트되었습니다.',
+      application: applications[applicationIndex]
+    })
+  } catch (error) {
+    return c.json({ success: false, message: '상태 업데이트 중 오류가 발생했습니다.' }, 500)
+  }
+})
+
+// 관리자 페이지
+app.get('/admin', (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="ko">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>관리자 페이지 - 한국학원경영아카데미</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+          .academy-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          }
+          .admin-card {
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+          }
+          .status-pending { @apply bg-yellow-100 text-yellow-800; }
+          .status-approved { @apply bg-green-100 text-green-800; }
+          .status-rejected { @apply bg-red-100 text-red-800; }
+        </style>
+    </head>
+    <body class="bg-gray-50">
+        <!-- 헤더 -->
+        <header class="academy-bg text-white py-6">
+            <div class="max-w-7xl mx-auto px-4">
+                <div class="flex justify-between items-center">
+                    <h1 class="text-3xl font-bold">
+                        <i class="fas fa-cog mr-2"></i>
+                        관리자 페이지
+                    </h1>
+                    <div class="flex items-center space-x-4">
+                        <a href="/" class="bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg transition">
+                            <i class="fas fa-home mr-2"></i>메인 페이지
+                        </a>
+                        <button id="logoutBtn" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg transition">
+                            <i class="fas fa-sign-out-alt mr-2"></i>로그아웃
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- 로그인 폼 -->
+        <div id="loginSection" class="max-w-md mx-auto mt-20">
+            <div class="bg-white rounded-lg admin-card p-8">
+                <h2 class="text-2xl font-bold text-center mb-6">관리자 로그인</h2>
+                <form id="loginForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">비밀번호</label>
+                        <input type="password" id="password" required 
+                               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                    <button type="submit" 
+                            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-lg transition">
+                        <i class="fas fa-key mr-2"></i>로그인
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- 관리자 대시보드 -->
+        <div id="adminSection" class="max-w-7xl mx-auto px-4 py-8" style="display: none;">
+            <!-- 통계 카드 -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="bg-white rounded-lg admin-card p-6">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-list-alt text-3xl text-blue-600"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-500">전체 신청</p>
+                            <p id="totalCount" class="text-2xl font-bold text-gray-900">0</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-lg admin-card p-6">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-clock text-3xl text-yellow-600"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-500">대기 중</p>
+                            <p id="pendingCount" class="text-2xl font-bold text-yellow-600">0</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-lg admin-card p-6">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-check-circle text-3xl text-green-600"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-500">승인됨</p>
+                            <p id="approvedCount" class="text-2xl font-bold text-green-600">0</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-lg admin-card p-6">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-times-circle text-3xl text-red-600"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-500">거부됨</p>
+                            <p id="rejectedCount" class="text-2xl font-bold text-red-600">0</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 신청 목록 -->
+            <div class="bg-white rounded-lg admin-card">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-lg font-medium text-gray-900">대관신청 목록</h3>
+                        <button id="refreshBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition">
+                            <i class="fas fa-sync-alt mr-2"></i>새로고침
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">신청정보</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">사용일시</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">목적/인원</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">상태</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">액션</th>
+                            </tr>
+                        </thead>
+                        <tbody id="applicationsTable" class="bg-white divide-y divide-gray-200">
+                            <!-- 동적으로 생성 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 상태 변경 모달 -->
+        <div id="statusModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg admin-card p-6 w-full max-w-md">
+                <h3 class="text-lg font-medium mb-4">신청 상태 변경</h3>
+                <form id="statusForm">
+                    <input type="hidden" id="modalApplicationId">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">상태</label>
+                        <select id="modalStatus" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            <option value="pending">대기 중</option>
+                            <option value="approved">승인</option>
+                            <option value="rejected">거부</option>
+                        </select>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">관리자 메모</label>
+                        <textarea id="modalNotes" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="승인/거부 사유나 추가 메모를 입력하세요."></textarea>
+                    </div>
+                    <div class="flex justify-end space-x-2">
+                        <button type="button" id="cancelModal" class="px-4 py-2 text-gray-600 hover:text-gray-800">취소</button>
+                        <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">저장</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+        <script>
+            let authToken = '';
+            
+            // DOM 요소
+            const loginSection = document.getElementById('loginSection');
+            const adminSection = document.getElementById('adminSection');
+            const loginForm = document.getElementById('loginForm');
+            const logoutBtn = document.getElementById('logoutBtn');
+            const refreshBtn = document.getElementById('refreshBtn');
+            const statusModal = document.getElementById('statusModal');
+            const statusForm = document.getElementById('statusForm');
+            const cancelModal = document.getElementById('cancelModal');
+            
+            // 로그인 처리
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const password = document.getElementById('password').value;
+                
+                try {
+                    const response = await axios.post('/api/admin/login', { password });
+                    if (response.data.success) {
+                        authToken = password;
+                        loginSection.style.display = 'none';
+                        adminSection.style.display = 'block';
+                        loadApplications();
+                    } else {
+                        alert(response.data.message);
+                    }
+                } catch (error) {
+                    alert('로그인 중 오류가 발생했습니다.');
+                }
+            });
+            
+            // 로그아웃
+            logoutBtn.addEventListener('click', () => {
+                authToken = '';
+                loginSection.style.display = 'block';
+                adminSection.style.display = 'none';
+                document.getElementById('password').value = '';
+            });
+            
+            // 신청 목록 로드
+            async function loadApplications() {
+                try {
+                    const response = await axios.get('/api/admin/applications', {
+                        headers: { Authorization: \`Bearer \${authToken}\` }
+                    });
+                    
+                    if (response.data.success) {
+                        updateStatistics(response.data.applications);
+                        renderApplications(response.data.applications);
+                    }
+                } catch (error) {
+                    console.error('신청 목록 로드 실패:', error);
+                }
+            }
+            
+            // 통계 업데이트
+            function updateStatistics(applications) {
+                const total = applications.length;
+                const pending = applications.filter(app => app.status === 'pending').length;
+                const approved = applications.filter(app => app.status === 'approved').length;
+                const rejected = applications.filter(app => app.status === 'rejected').length;
+                
+                document.getElementById('totalCount').textContent = total;
+                document.getElementById('pendingCount').textContent = pending;
+                document.getElementById('approvedCount').textContent = approved;
+                document.getElementById('rejectedCount').textContent = rejected;
+            }
+            
+            // 신청 목록 렌더링
+            function renderApplications(applications) {
+                const tbody = document.getElementById('applicationsTable');
+                tbody.innerHTML = '';
+                
+                applications.forEach(app => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = \`
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900">\${app.name}</div>
+                            <div class="text-sm text-gray-500">\${app.phone}</div>
+                            <div class="text-sm text-gray-500">\${app.email}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">\${app.date}</div>
+                            <div class="text-sm text-gray-500">\${app.startTime} - \${app.endTime}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">\${app.purpose}</div>
+                            <div class="text-sm text-gray-500">\${app.participants}명</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full status-\${app.status}">
+                                \${getStatusText(app.status)}
+                            </span>
+                            \${app.adminNotes ? \`<div class="text-xs text-gray-500 mt-1">\${app.adminNotes}</div>\` : ''}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <button onclick="openStatusModal(\${app.id}, '\${app.status}', '\${app.adminNotes || ''}')" 
+                                    class="text-blue-600 hover:text-blue-900 mr-2">
+                                <i class="fas fa-edit"></i> 상태변경
+                            </button>
+                        </td>
+                    \`;
+                    tbody.appendChild(tr);
+                });
+            }
+            
+            // 상태 텍스트 변환
+            function getStatusText(status) {
+                switch (status) {
+                    case 'pending': return '대기 중';
+                    case 'approved': return '승인';
+                    case 'rejected': return '거부';
+                    default: return status;
+                }
+            }
+            
+            // 상태 변경 모달 열기
+            function openStatusModal(id, status, notes) {
+                document.getElementById('modalApplicationId').value = id;
+                document.getElementById('modalStatus').value = status;
+                document.getElementById('modalNotes').value = notes;
+                statusModal.classList.remove('hidden');
+            }
+            
+            // 모달 닫기
+            cancelModal.addEventListener('click', () => {
+                statusModal.classList.add('hidden');
+            });
+            
+            // 상태 업데이트
+            statusForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const id = document.getElementById('modalApplicationId').value;
+                const status = document.getElementById('modalStatus').value;
+                const notes = document.getElementById('modalNotes').value;
+                
+                try {
+                    const response = await axios.put(\`/api/admin/applications/\${id}/status\`, 
+                        { status, notes },
+                        { headers: { Authorization: \`Bearer \${authToken}\` } }
+                    );
+                    
+                    if (response.data.success) {
+                        statusModal.classList.add('hidden');
+                        loadApplications();
+                        alert('상태가 업데이트되었습니다.');
+                    } else {
+                        alert(response.data.message);
+                    }
+                } catch (error) {
+                    alert('상태 업데이트 중 오류가 발생했습니다.');
+                }
+            });
+            
+            // 새로고침
+            refreshBtn.addEventListener('click', loadApplications);
+            
+            // 전역 함수로 등록
+            window.openStatusModal = openStatusModal;
+        </script>
+    </body>
+    </html>
+  `)
 })
 
 // 메인 페이지
