@@ -173,6 +173,9 @@ app.get('/admin', (c) => {
                         <a href="/" class="bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg transition">
                             <i class="fas fa-home mr-2"></i>메인 페이지
                         </a>
+                        <a href="/school" class="bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg transition">
+                            <i class="fas fa-school mr-2"></i>학교 조회
+                        </a>
                         <button id="logoutBtn" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg transition">
                             <i class="fas fa-sign-out-alt mr-2"></i>로그아웃
                         </button>
@@ -725,6 +728,385 @@ app.get('/', (c) => {
     </body>
     </html>
   `)
+})
+
+// 학교알리미 API 프록시
+const NEIS_API_KEY = '1aeafbe191b946558d453d9e357f284a'
+const NEIS_BASE_URL = 'https://open.neis.go.kr/hub'
+
+app.get('/api/school/search', async (c) => {
+  const schoolName = c.req.query('name') || ''
+  const region = c.req.query('region') || ''
+  const page = c.req.query('page') || '1'
+
+  if (!schoolName) {
+    return c.json({ success: false, message: '학교명을 입력해주세요.' }, 400)
+  }
+
+  try {
+    const params = new URLSearchParams({
+      KEY: NEIS_API_KEY,
+      Type: 'json',
+      pIndex: page,
+      pSize: '20',
+      SCHUL_NM: schoolName,
+    })
+    if (region) params.set('ATPT_OFCDC_SC_CODE', region)
+
+    const url = `${NEIS_BASE_URL}/schoolInfo?${params.toString()}`
+    const res = await fetch(url)
+    const data: any = await res.json()
+
+    if (data.RESULT?.CODE === 'INFO-200') {
+      return c.json({ success: true, schools: [], total: 0 })
+    }
+
+    if (!data.schoolInfo) {
+      return c.json({ success: false, message: '조회 결과가 없습니다.' }, 404)
+    }
+
+    const head = data.schoolInfo[0].head
+    const total = head[0].list_total_count
+    const schools = data.schoolInfo[1].row
+
+    return c.json({ success: true, schools, total })
+  } catch (error) {
+    console.error('NEIS API error:', error)
+    return c.json({ success: false, message: 'API 호출 중 오류가 발생했습니다.' }, 500)
+  }
+})
+
+// 학교 상세 정보 (기본학교정보)
+app.get('/api/school/detail', async (c) => {
+  const sdCode = c.req.query('sdCode') || ''
+  const schulCode = c.req.query('schulCode') || ''
+
+  if (!sdCode || !schulCode) {
+    return c.json({ success: false, message: '학교 코드가 필요합니다.' }, 400)
+  }
+
+  try {
+    const params = new URLSearchParams({
+      KEY: NEIS_API_KEY,
+      Type: 'json',
+      pIndex: '1',
+      pSize: '1',
+      ATPT_OFCDC_SC_CODE: sdCode,
+      SD_SCHUL_CODE: schulCode,
+    })
+
+    const res = await fetch(`${NEIS_BASE_URL}/schoolInfo?${params.toString()}`)
+    const data: any = await res.json()
+
+    if (!data.schoolInfo) {
+      return c.json({ success: false, message: '학교 정보를 찾을 수 없습니다.' }, 404)
+    }
+
+    const school = data.schoolInfo[1].row[0]
+    return c.json({ success: true, school })
+  } catch (error) {
+    return c.json({ success: false, message: 'API 호출 중 오류가 발생했습니다.' }, 500)
+  }
+})
+
+// 학교 조회 페이지
+app.get('/school', (c) => {
+  return c.html(`<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>학교 정보 조회 - 한국학원경영아카데미</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+  <style>
+    .academy-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    .card { box-shadow: 0 4px 6px -1px rgba(0,0,0,.1), 0 2px 4px -1px rgba(0,0,0,.06); }
+    .school-row:hover { background-color: #f0f4ff; cursor: pointer; }
+    .badge-elem { background:#dbeafe; color:#1e40af; }
+    .badge-middle { background:#dcfce7; color:#166534; }
+    .badge-high { background:#fef3c7; color:#92400e; }
+    .badge-special { background:#ede9fe; color:#5b21b6; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <header class="academy-bg text-white py-6">
+    <div class="max-w-6xl mx-auto px-4 flex justify-between items-center">
+      <div>
+        <h1 class="text-2xl font-bold"><i class="fas fa-school mr-2"></i>학교 정보 조회</h1>
+        <p class="text-blue-100 text-sm mt-1">학교알리미 Open API 연동</p>
+      </div>
+      <a href="/" class="bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg text-sm transition">
+        <i class="fas fa-home mr-1"></i>메인으로
+      </a>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-8">
+    <!-- 검색 폼 -->
+    <div class="bg-white rounded-xl card p-6 mb-6">
+      <h2 class="text-lg font-semibold text-gray-800 mb-4"><i class="fas fa-search mr-2 text-blue-600"></i>학교 검색</h2>
+      <div class="flex flex-col md:flex-row gap-3">
+        <div class="flex-1">
+          <label class="block text-sm font-medium text-gray-700 mb-1">학교명</label>
+          <input id="schoolName" type="text" placeholder="학교 이름을 입력하세요 (예: 광명초등학교)"
+            class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm">
+        </div>
+        <div class="w-full md:w-48">
+          <label class="block text-sm font-medium text-gray-700 mb-1">지역교육청</label>
+          <select id="region" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm">
+            <option value="">전체</option>
+            <option value="B10">서울</option>
+            <option value="C10">부산</option>
+            <option value="D10">대구</option>
+            <option value="E10">인천</option>
+            <option value="F10">광주</option>
+            <option value="G10">대전</option>
+            <option value="H10">울산</option>
+            <option value="I10">세종</option>
+            <option value="J10">경기</option>
+            <option value="K10">강원</option>
+            <option value="M10">충북</option>
+            <option value="N10">충남</option>
+            <option value="P10">전북</option>
+            <option value="Q10">전남</option>
+            <option value="R10">경북</option>
+            <option value="S10">경남</option>
+            <option value="T10">제주</option>
+          </select>
+        </div>
+        <div class="flex items-end">
+          <button id="searchBtn" onclick="searchSchools(1)"
+            class="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-lg transition text-sm">
+            <i class="fas fa-search mr-2"></i>검색
+          </button>
+        </div>
+      </div>
+      <p class="text-xs text-gray-400 mt-2">* 2026년 1월 이후 발급 인증키는 시·군·구 파라미터가 필수입니다.</p>
+    </div>
+
+    <!-- 결과 영역 -->
+    <div id="resultArea" class="hidden">
+      <div class="flex justify-between items-center mb-3">
+        <span id="resultCount" class="text-sm text-gray-600 font-medium"></span>
+        <span class="text-xs text-gray-400">학교명 클릭 시 상세 정보 확인</span>
+      </div>
+
+      <div class="bg-white rounded-xl card overflow-hidden mb-4">
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-sm">
+            <thead class="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th class="px-4 py-3 text-left font-medium text-gray-600">학교명</th>
+                <th class="px-4 py-3 text-left font-medium text-gray-600">종류</th>
+                <th class="px-4 py-3 text-left font-medium text-gray-600">설립</th>
+                <th class="px-4 py-3 text-left font-medium text-gray-600">주소</th>
+                <th class="px-4 py-3 text-left font-medium text-gray-600">전화번호</th>
+                <th class="px-4 py-3 text-left font-medium text-gray-600">홈페이지</th>
+              </tr>
+            </thead>
+            <tbody id="resultTable" class="divide-y divide-gray-100"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 페이지네이션 -->
+      <div id="pagination" class="flex justify-center gap-2"></div>
+    </div>
+
+    <!-- 빈 상태 -->
+    <div id="emptyState" class="text-center py-16 text-gray-400">
+      <i class="fas fa-school text-5xl mb-4 block"></i>
+      <p class="text-lg">학교명을 입력하고 검색해보세요</p>
+    </div>
+
+    <!-- 로딩 -->
+    <div id="loadingState" class="hidden text-center py-16 text-gray-400">
+      <i class="fas fa-spinner fa-spin text-4xl mb-4 block text-blue-400"></i>
+      <p>학교 정보를 불러오는 중...</p>
+    </div>
+
+    <!-- 상세 모달 -->
+    <div id="detailModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-xl w-full max-w-2xl max-h-screen overflow-y-auto">
+        <div class="academy-bg text-white px-6 py-4 rounded-t-xl flex justify-between items-center">
+          <h3 id="modalTitle" class="text-lg font-bold"></h3>
+          <button onclick="closeModal()" class="text-white hover:text-gray-200 text-xl"><i class="fas fa-times"></i></button>
+        </div>
+        <div id="modalContent" class="p-6"></div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    let currentPage = 1;
+    let totalCount = 0;
+
+    document.getElementById('schoolName').addEventListener('keydown', e => {
+      if (e.key === 'Enter') searchSchools(1);
+    });
+
+    async function searchSchools(page) {
+      const name = document.getElementById('schoolName').value.trim();
+      const region = document.getElementById('region').value;
+
+      if (!name) { alert('학교명을 입력해주세요.'); return; }
+
+      currentPage = page;
+      document.getElementById('emptyState').classList.add('hidden');
+      document.getElementById('resultArea').classList.add('hidden');
+      document.getElementById('loadingState').classList.remove('hidden');
+
+      try {
+        const params = new URLSearchParams({ name, page });
+        if (region) params.set('region', region);
+
+        const res = await fetch('/api/school/search?' + params.toString());
+        const data = await res.json();
+
+        document.getElementById('loadingState').classList.add('hidden');
+
+        if (!data.success || data.total === 0) {
+          document.getElementById('emptyState').classList.remove('hidden');
+          document.getElementById('emptyState').innerHTML = '<i class="fas fa-search text-5xl mb-4 block"></i><p class="text-lg">검색 결과가 없습니다</p>';
+          return;
+        }
+
+        totalCount = data.total;
+        renderResults(data.schools, data.total);
+        renderPagination(data.total);
+        document.getElementById('resultArea').classList.remove('hidden');
+      } catch (err) {
+        document.getElementById('loadingState').classList.add('hidden');
+        document.getElementById('emptyState').classList.remove('hidden');
+        document.getElementById('emptyState').innerHTML = '<i class="fas fa-exclamation-triangle text-5xl mb-4 block text-red-400"></i><p class="text-lg text-red-500">API 호출 중 오류가 발생했습니다</p>';
+      }
+    }
+
+    function schoolTypeBadge(type) {
+      const map = { '초등학교': 'badge-elem', '중학교': 'badge-middle', '고등학교': 'badge-high', '특수학교': 'badge-special' };
+      const cls = map[type] || 'bg-gray-100 text-gray-600';
+      return \`<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium \${cls}">\${type}</span>\`;
+    }
+
+    function renderResults(schools, total) {
+      document.getElementById('resultCount').textContent = \`총 \${total.toLocaleString()}개 학교 검색됨 (현재 페이지: \${currentPage})\`;
+      const tbody = document.getElementById('resultTable');
+      tbody.innerHTML = '';
+      schools.forEach(s => {
+        const tr = document.createElement('tr');
+        tr.className = 'school-row';
+        tr.innerHTML = \`
+          <td class="px-4 py-3 font-medium text-blue-700" onclick="showDetail('\${s.ATPT_OFCDC_SC_CODE}', '\${s.SD_SCHUL_CODE}', '\${escapeHtml(s.SCHUL_NM)}')">\${s.SCHUL_NM}</td>
+          <td class="px-4 py-3">\${schoolTypeBadge(s.SCHUL_KND_SC_NM)}</td>
+          <td class="px-4 py-3 text-gray-600 text-xs">\${s.FOND_SC_NM || '-'}</td>
+          <td class="px-4 py-3 text-gray-600 text-xs">\${s.ORG_RDNMA || s.ORG_RDNZC || '-'}</td>
+          <td class="px-4 py-3 text-gray-600 text-xs">\${s.ORG_TELNO || '-'}</td>
+          <td class="px-4 py-3 text-xs">\${s.HMPG_ADRES ? \`<a href="\${s.HMPG_ADRES}" target="_blank" class="text-blue-500 hover:underline">바로가기</a>\` : '-'}</td>
+        \`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderPagination(total) {
+      const perPage = 20;
+      const totalPages = Math.ceil(total / perPage);
+      const container = document.getElementById('pagination');
+      container.innerHTML = '';
+
+      const start = Math.max(1, currentPage - 4);
+      const end = Math.min(totalPages, start + 9);
+
+      if (currentPage > 1) {
+        const btn = document.createElement('button');
+        btn.textContent = '이전';
+        btn.className = 'px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-100';
+        btn.onclick = () => searchSchools(currentPage - 1);
+        container.appendChild(btn);
+      }
+
+      for (let i = start; i <= end; i++) {
+        const btn = document.createElement('button');
+        btn.textContent = i;
+        btn.className = i === currentPage
+          ? 'px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg'
+          : 'px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-100';
+        btn.onclick = ((p) => () => searchSchools(p))(i);
+        container.appendChild(btn);
+      }
+
+      if (currentPage < totalPages) {
+        const btn = document.createElement('button');
+        btn.textContent = '다음';
+        btn.className = 'px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-100';
+        btn.onclick = () => searchSchools(currentPage + 1);
+        container.appendChild(btn);
+      }
+    }
+
+    async function showDetail(sdCode, schulCode, name) {
+      document.getElementById('modalTitle').textContent = name;
+      document.getElementById('modalContent').innerHTML = '<div class="text-center py-8"><i class="fas fa-spinner fa-spin text-3xl text-blue-400"></i></div>';
+      document.getElementById('detailModal').classList.remove('hidden');
+
+      try {
+        const res = await fetch(\`/api/school/detail?sdCode=\${sdCode}&schulCode=\${schulCode}\`);
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+        renderDetail(data.school);
+      } catch (err) {
+        document.getElementById('modalContent').innerHTML = '<p class="text-red-500 text-center">상세 정보를 불러오지 못했습니다.</p>';
+      }
+    }
+
+    function renderDetail(s) {
+      const fields = [
+        ['학교명', s.SCHUL_NM],
+        ['영문명', s.ENG_SCHUL_NM],
+        ['학교종류', s.SCHUL_KND_SC_NM],
+        ['설립구분', s.FOND_SC_NM],
+        ['설립일', s.FOND_YMD],
+        ['시도교육청', s.ATPT_OFCDC_SC_NM],
+        ['교육지원청', s.JU_ORG_NM],
+        ['우편번호', s.ORG_RDNZC],
+        ['주소', s.ORG_RDNMA],
+        ['상세주소', s.ORG_RDNDA],
+        ['전화번호', s.ORG_TELNO],
+        ['팩스번호', s.ORG_FAXNO],
+        ['홈페이지', s.HMPG_ADRES ? \`<a href="\${s.HMPG_ADRES}" target="_blank" class="text-blue-500 hover:underline">\${s.HMPG_ADRES}</a>\` : null],
+        ['남녀공학구분', s.COEDU_SC_NM],
+        ['급식유형', s.MLSV_TYPE_NM],
+        ['고등학교구분', s.HS_SC_NM],
+        ['산업체부설여부', s.INDST_SPECL_CCCCL_EXIS_YN],
+        ['수정일', s.LOAD_DTM],
+      ];
+
+      const rows = fields
+        .filter(([_, v]) => v)
+        .map(([label, val]) => \`
+          <tr class="border-b border-gray-100">
+            <td class="py-2.5 pr-4 text-sm font-medium text-gray-500 whitespace-nowrap w-36">\${label}</td>
+            <td class="py-2.5 text-sm text-gray-800">\${val}</td>
+          </tr>\`)
+        .join('');
+
+      document.getElementById('modalContent').innerHTML = \`<table class="w-full">\${rows}</table>\`;
+    }
+
+    function closeModal() {
+      document.getElementById('detailModal').classList.add('hidden');
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/'/g, "\\\\'");
+    }
+
+    document.getElementById('detailModal').addEventListener('click', function(e) {
+      if (e.target === this) closeModal();
+    });
+  </script>
+</body>
+</html>`)
 })
 
 export default app
