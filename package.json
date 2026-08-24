@@ -3,6 +3,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "cards": "node scripts/make-logo.mjs && node scripts/make-stage.mjs && node scripts/build-cards.mjs",
     "build": "vite build",
     "preview": "wrangler pages dev",
     "deploy": "npm run build && wrangler pages deploy",

@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>구글시트 불러오기 | 한국학원경영아카데미 소개 카드</title>
+<link rel="icon" href="assets/keba-logo.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/card.css">
+<style>
+  .wrap { max-width: 1000px; margin: 0 auto; font-family: 'Noto Sans KR', 'Malgun Gothic', sans-serif; }
+  h1 { font-family: 'Black Han Sans', sans-serif; font-weight: 400; font-size: 30px; margin: 8px 0 4px; }
+  h2 { font-size: 17px; color: var(--gold); margin: 30px 0 10px; }
+  p.hint { color: #9a9a9a; font-size: 14px; line-height: 1.7; margin: 6px 0 0; }
+  input[type=url], textarea {
+    width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid #333;
+    background: #101010; color: #eee; font-size: 14px; font-family: inherit;
+  }
+  textarea { min-height: 170px; resize: vertical; white-space: pre; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
+  th, td { border: 1px solid #262626; padding: 8px 10px; text-align: left; }
+  th { background: #141414; color: var(--gold); }
+  .status { margin-top: 12px; font-size: 14px; color: #cfcfcf; min-height: 22px; }
+  .status.err { color: #ff8f8f; }
+  .status.ok { color: #8fe0a0; }
+  code { background: #151515; padding: 2px 6px; border-radius: 5px; color: #e5c97e; }
+  pre { background: #0f0f0f; border: 1px solid #262626; border-radius: 10px; padding: 14px; overflow-x: auto; font-size: 13px; color: #d8d8d8; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="wrap">
+    <div class="topbar">
+      <a class="brand" href="index.html"><img src="assets/keba-logo.svg" alt=""><span>한국학원경영아카데미</span></a>
+      <a class="btn" href="index.html">← 전체 목록</a>
+    </div>
+
+    <h1>구글시트에서 명단 불러오기</h1>
+    <p class="hint">
+      시트를 불러와 <code>data/members.csv</code> 파일을 만든 뒤,
+      터미널에서 <code>npm run cards</code> 를 실행하면 카드 HTML이 전부 다시 만들어집니다.
+    </p>
+
+    <h2>1. 구글시트 주소로 불러오기</h2>
+    <p class="hint">시트가 <b>“링크가 있는 모든 사용자 - 뷰어”</b> 로 공유되어 있어야 합니다.</p>
+    <input type="url" id="url" value="https://docs.google.com/spreadsheets/d/1v4RDtHUxgF6Dwrg1BEwG0uqUCZBKapJCjRJBPjaxnEY/edit?usp=sharing">
+    <div class="row">
+      <button class="btn" id="fetchBtn">시트 불러오기</button>
+    </div>
+
+    <h2>2. 안 될 때는 직접 붙여넣기</h2>
+    <p class="hint">구글시트에서 표를 드래그해 복사(Ctrl+C)한 뒤 아래에 붙여넣으세요. 첫 줄은 <code>기수 / 이름 / 학원</code> 머리글입니다.</p>
+    <textarea id="paste" placeholder="기수&#9;이름&#9;학원&#10;한경아 4기&#9;김선정&#9;이즈유"></textarea>
+    <div class="row">
+      <button class="btn" id="pasteBtn">붙여넣은 내용 사용</button>
+    </div>
+
+    <div class="status" id="status"></div>
+
+    <div id="result" hidden>
+      <h2>3. 미리보기</h2>
+      <div id="preview"></div>
+      <div class="row">
+        <button class="btn" id="downloadBtn">members.csv 내려받기</button>
+        <button class="btn" id="copyBtn">CSV 복사</button>
+      </div>
+      <h2>4. 마무리</h2>
+      <pre># 내려받은 members.csv 를 프로젝트의 data/ 폴더에 덮어쓰고
+npm run cards</pre>
+    </div>
+
+    <div class="foot">
+      한국학원경영아카데미 · 문의 010-8394-0484 · <a href="mailto:petcky@gmail.com">petcky@gmail.com</a>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var statusEl = document.getElementById('status');
+  var resultEl = document.getElementById('result');
+  var previewEl = document.getElementById('preview');
+  var csvText = '';
+
+  function say(msg, cls) { statusEl.textContent = msg; statusEl.className = 'status ' + (cls || ''); }
+
+  function splitRows(text, delim) {
+    var rows = [], row = [], field = '', q = false;
+    text = text.replace(/^﻿/, '').replace(/\r\n?/g, '\n');
+    for (var i = 0; i < text.length; i++) {
+      var ch = text[i];
+      if (q) {
+        if (ch === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else q = false; }
+        else field += ch;
+      } else if (ch === '"') q = true;
+      else if (ch === delim) { row.push(field); field = ''; }
+      else if (ch === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+      else field += ch;
+    }
+    row.push(field); rows.push(row);
+    return rows.filter(function (r) { return r.some(function (c) { return c.trim() !== ''; }); });
+  }
+
+  var KEYS = {
+    cohort: ['기수', '차수', '과정', 'cohort', 'term'],
+    name: ['이름', '성명', '원장', '수강생', 'name'],
+    academy: ['학원', '학원명', '소속', '기관', 'academy', 'school']
+  };
+
+  function findCol(header, keys) {
+    for (var i = 0; i < header.length; i++) {
+      var h = String(header[i]).trim().toLowerCase();
+      for (var j = 0; j < keys.length; j++) if (h.indexOf(keys[j].toLowerCase()) !== -1) return i;
+    }
+    return -1;
+  }
+
+  function toMembers(rows) {
+    if (!rows.length) return [];
+    var head = rows[0];
+    var c = { cohort: findCol(head, KEYS.cohort), name: findCol(head, KEYS.name), academy: findCol(head, KEYS.academy) };
+    var hasHeader = c.name !== -1 || c.academy !== -1;
+    if (!hasHeader) c = { cohort: 0, name: 1, academy: 2 };
+    return (hasHeader ? rows.slice(1) : rows).map(function (r) {
+      return {
+        cohort: (c.cohort > -1 && r[c.cohort] ? r[c.cohort] : '').trim(),
+        name: (c.name > -1 && r[c.name] ? r[c.name] : '').trim(),
+        academy: (c.academy > -1 && r[c.academy] ? r[c.academy] : '').trim()
+      };
+    }).filter(function (m) { return m.name || m.academy; });
+  }
+
+  function q(v) { return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+
+  function render(members) {
+    if (!members.length) { say('사용할 수 있는 행을 찾지 못했습니다. 머리글이 기수 / 이름 / 학원 인지 확인해 주세요.', 'err'); return; }
+    csvText = '기수,이름,학원\n' + members.map(function (m) {
+      return [q(m.cohort), q(m.name), q(m.academy)].join(',');
+    }).join('\n') + '\n';
+
+    var html = '<table><tr><th>#</th><th>기수</th><th>이름</th><th>학원</th></tr>';
+    members.forEach(function (m, i) {
+      html += '<tr><td>' + (i + 1) + '</td><td>' + esc(m.cohort) + '</td><td>' + esc(m.name) + '</td><td>' + esc(m.academy) + '</td></tr>';
+    });
+    previewEl.innerHTML = html + '</table>';
+    resultEl.hidden = false;
+    say(members.length + '명을 읽었습니다.', 'ok');
+  }
+
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+  document.getElementById('fetchBtn').addEventListener('click', function () {
+    var url = document.getElementById('url').value.trim();
+    var m = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+    if (!m) { say('구글시트 주소 형식이 아닙니다.', 'err'); return; }
+    var gid = (url.match(/[#&?]gid=(\d+)/) || [])[1] || '0';
+    var api = 'https://docs.google.com/spreadsheets/d/' + m[1] + '/gviz/tq?tqx=out:csv&gid=' + gid;
+    say('불러오는 중…');
+    fetch(api)
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+      .then(function (t) { render(toMembers(splitRows(t, ','))); })
+      .catch(function (e) {
+        say('불러오지 못했습니다 (' + e.message + '). 시트 공유 설정을 확인하거나 아래 2번 방법으로 붙여넣어 주세요.', 'err');
+      });
+  });
+
+  document.getElementById('pasteBtn').addEventListener('click', function () {
+    var t = document.getElementById('paste').value;
+    if (!t.trim()) { say('붙여넣은 내용이 없습니다.', 'err'); return; }
+    var delim = t.indexOf('\t') !== -1 ? '\t' : ',';
+    render(toMembers(splitRows(t, delim)));
+  });
+
+  document.getElementById('downloadBtn').addEventListener('click', function () {
+    var blob = new Blob(['﻿' + csvText], { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'members.csv';
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  });
+
+  document.getElementById('copyBtn').addEventListener('click', function () {
+    navigator.clipboard.writeText(csvText).then(function () { say('CSV를 클립보드에 복사했습니다.', 'ok'); });
+  });
+})();
+</script>
+</body>
+</html>

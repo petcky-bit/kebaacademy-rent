@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>한국학원경영아카데미 소개 카드</title>
+<meta name="description" content="한국학원경영아카데미 원장님 소개 카드 모음">
+<meta property="og:title" content="한국학원경영아카데미 소개 카드">
+<meta property="og:description" content="한국학원경영아카데미 원장님 소개 카드 모음">
+<link rel="icon" href="assets/keba-logo.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Jua&family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/card.css">
+</head>
+<body>
+<div class="page">
+  <div class="list">
+    <div class="list__head">
+      <img src="assets/keba-logo.svg" alt="한국학원경영아카데미 KEBA 엠블럼">
+      <h1>한국학원경영아카데미</h1>
+      <p>원장님 소개 카드 · 총 <strong id="total">1</strong>명</p>
+      <input class="search" id="q" type="search" placeholder="이름 · 학원 · 기수로 검색" autocomplete="off">
+      <p style="margin-top:14px"><a class="btn" href="import.html">구글시트에서 명단 불러오기</a></p>
+    </div>
+
+    <ul class="grid" id="grid">
+      <li class="grid__item" data-search="김선정 이즈유 한경아 4기">
+        <a href="card-001.html">
+          <div class="stage">
+      <img class="stage__bg" src="assets/stage.svg" alt="">
+      <div class="stage__inner">
+        <img class="stage__logo" src="assets/keba-logo.svg" alt="한국학원경영아카데미 KEBA 엠블럼">
+        <h1 class="stage__title is-long">한경아 4기 김선정</h1>
+        <p class="stage__subtitle">이즈유</p>
+      </div>
+    </div>
+          <div class="grid__meta">
+            <div class="grid__name">김선정</div>
+            <div class="grid__academy">이즈유</div>
+            <div class="grid__cohort">한경아 4기</div>
+          </div>
+        </a>
+      </li>
+    </ul>
+    <p class="empty" id="empty" hidden>검색 결과가 없습니다.</p>
+
+    <div class="foot">
+      한국학원경영아카데미 · 경기도 광명시 일직로 43, GIDC C동 1705호<br>
+      문의 010-8394-0484 · <a href="mailto:petcky@gmail.com">petcky@gmail.com</a>
+    </div>
+  </div>
+</div>
+<script>
+  var q = document.getElementById('q');
+  var items = Array.prototype.slice.call(document.querySelectorAll('.grid__item'));
+  var empty = document.getElementById('empty');
+  q.addEventListener('input', function () {
+    var v = q.value.trim().toLowerCase();
+    var shown = 0;
+    items.forEach(function (li) {
+      var hit = !v || li.dataset.search.indexOf(v) !== -1;
+      li.hidden = !hit;
+      if (hit) shown++;
+    });
+    empty.hidden = shown !== 0;
+  });
+</script>
+</body>
+</html>

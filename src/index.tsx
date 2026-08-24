@@ -16,6 +16,9 @@ app.use('/api/*', cors())
 
 // 정적 파일 서빙
 app.use('/static/*', serveStatic({ root: './public' }))
+app.use('/cards/*', serveStatic({ root: './public' }))
+app.get('/cards', (c) => c.redirect('/cards/index.html'))
+app.get('/cards/', (c) => c.redirect('/cards/index.html'))
 
 // 대관신청 접수 API
 app.post('/api/application', async (c) => {
@@ -507,6 +510,11 @@ app.get('/', (c) => {
                         한국학원경영아카데미
                     </h1>
                     <p class="text-xl text-blue-100">교육시설 대관신청</p>
+                    <p class="mt-4">
+                        <a href="/cards/" class="inline-block bg-white/15 hover:bg-white/25 border border-white/40 px-5 py-2 rounded-full text-sm transition">
+                            <i class="fas fa-id-card mr-2"></i>원장님 소개 카드 보기
+                        </a>
+                    </p>
                 </div>
             </div>
         </header>

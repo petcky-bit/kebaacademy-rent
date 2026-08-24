@@ -118,3 +118,42 @@ npm run build
 wrangler pages deploy dist --project-name webapp
 ```
 ## 배포 시간: Sun Aug 17 10:18:12 UTC 2025
+
+---
+
+## 원장님 소개 카드 (HTML)
+
+첨부 이미지와 동일한 무대 디자인을 HTML/CSS/SVG로 재현한 소개 카드입니다.
+이미지 파일이 아니라 순수 HTML이므로 이름·학원만 바꾸면 인원수만큼 자동 생성됩니다.
+
+### 구성
+- `data/members.csv` — 원본 명단 (`기수,이름,학원`)
+- `scripts/make-logo.mjs` — KEBA 엠블럼 SVG 생성
+- `scripts/make-stage.mjs` — 무대(커튼·배너·골드리본) 배경 SVG 생성
+- `scripts/build-cards.mjs` — CSV → 카드 HTML 생성
+- `public/cards/index.html` — 전체 목록(검색 + 카드 클릭 시 개별 페이지로 이동)
+- `public/cards/card-001.html …` — 1인 1페이지 (이전/다음 화살표로 연결)
+- `public/cards/import.html` — 구글시트에서 명단을 불러와 `members.csv`를 만드는 도구
+
+### 접속 경로
+- 목록: `/cards/` (메인 페이지 상단 “원장님 소개 카드 보기” 버튼)
+- 개별: `/cards/card-001.html`
+- 불러오기 도구: `/cards/import.html`
+
+### 명단 갱신 방법
+1. 브라우저에서 `/cards/import.html` 접속
+2. 구글시트 주소를 넣고 **시트 불러오기** (시트는 “링크가 있는 모든 사용자 - 뷰어” 공유 필요)
+   - 불러오기가 막히면 시트에서 표를 복사해 붙여넣기 칸에 그대로 붙여넣습니다
+3. **members.csv 내려받기** → 프로젝트의 `data/members.csv` 에 덮어쓰기
+4. 터미널에서 재생성
+
+```bash
+npm run cards
+```
+
+명단이 6명이면 `card-001.html ~ card-006.html` 이 만들어지고
+목록 페이지와 이전/다음 링크가 모두 자동으로 연결됩니다.
+
+### 글꼴
+제목은 Google Fonts의 `Black Han Sans`(대체: Jua → 맑은 고딕)를 사용합니다.
+이름이나 학원명이 길면 글자 크기가 자동으로 줄어듭니다.
