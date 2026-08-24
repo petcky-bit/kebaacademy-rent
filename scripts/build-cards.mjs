@@ -2,14 +2,19 @@
 /**
  * data/members.csv → public/cards/*.html 정적 페이지 생성
  *
- *   node scripts/build-cards.mjs [csv경로]
+ *   node scripts/build-cards.mjs [csv 또는 xlsx 경로]
  *
- * CSV 헤더는 기수,이름,학원 (또는 cohort,name,academy) 을 인식합니다.
+ * data/members.xlsx 가 있으면 우선 사용하고, 없으면 data/members.csv 를 씁니다.
+ * 헤더는 기수,이름,학원 (또는 cohort,name,academy) 을 인식합니다.
  */
-import { readFileSync, writeFileSync, readdirSync, unlinkSync, mkdirSync } from 'node:fs'
+import { readFileSync, writeFileSync, readdirSync, unlinkSync, mkdirSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { readXlsx } from './read-xlsx.mjs'
 
-const CSV_PATH = process.argv[2] || 'data/members.csv'
+// 인자 > data/members.xlsx > data/members.csv 순으로 사용
+const CSV_PATH =
+  process.argv[2] ||
+  (existsSync('data/members.xlsx') ? 'data/members.xlsx' : 'data/members.csv')
 const OUT_DIR = 'public/cards'
 
 /* ── CSV 파서 (따옴표/줄바꿈 포함 지원) ───────────── */
@@ -50,7 +55,9 @@ function pickColumns(header) {
 }
 
 function loadMembers(path) {
-  const rows = parseCsv(readFileSync(path, 'utf8'))
+  const rows = /\.xlsx$/i.test(path)
+    ? readXlsx(path).map((r) => r.map((c) => String(c ?? '')))
+    : parseCsv(readFileSync(path, 'utf8'))
   if (rows.length === 0) return []
   const idx = pickColumns(rows[0])
   const hasHeader = idx.name !== -1 || idx.academy !== -1

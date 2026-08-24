@@ -51,7 +51,13 @@
       <button class="btn" id="fetchBtn">시트 불러오기</button>
     </div>
 
-    <h2>2. 안 될 때는 직접 붙여넣기</h2>
+    <h2>2. 엑셀 파일(.xlsx) 열기</h2>
+    <p class="hint">구글시트에서 <b>파일 &gt; 다운로드 &gt; Microsoft Excel(.xlsx)</b> 로 받은 파일을 그대로 선택하세요.</p>
+    <div class="row">
+      <input type="file" id="file" accept=".xlsx,.csv,text/csv" style="color:#ccc;font-size:14px">
+    </div>
+
+    <h2>3. 안 될 때는 직접 붙여넣기</h2>
     <p class="hint">구글시트에서 표를 드래그해 복사(Ctrl+C)한 뒤 아래에 붙여넣으세요. 첫 줄은 <code>기수 / 이름 / 학원</code> 머리글입니다.</p>
     <textarea id="paste" placeholder="기수&#9;이름&#9;학원&#10;한경아 4기&#9;김선정&#9;이즈유"></textarea>
     <div class="row">
@@ -61,13 +67,13 @@
     <div class="status" id="status"></div>
 
     <div id="result" hidden>
-      <h2>3. 미리보기</h2>
+      <h2>4. 미리보기</h2>
       <div id="preview"></div>
       <div class="row">
         <button class="btn" id="downloadBtn">members.csv 내려받기</button>
         <button class="btn" id="copyBtn">CSV 복사</button>
       </div>
-      <h2>4. 마무리</h2>
+      <h2>5. 마무리</h2>
       <pre># 내려받은 members.csv 를 프로젝트의 data/ 폴더에 덮어쓰고
 npm run cards</pre>
     </div>
@@ -172,6 +178,108 @@ npm run cards</pre>
     if (!t.trim()) { say('붙여넣은 내용이 없습니다.', 'err'); return; }
     var delim = t.indexOf('\t') !== -1 ? '\t' : ',';
     render(toMembers(splitRows(t, delim)));
+  });
+
+  /* ── 브라우저용 최소 XLSX 리더 ─────────────── */
+  function inflateRaw(bytes) {
+    if (typeof DecompressionStream === 'undefined') return Promise.reject(new Error('이 브라우저는 xlsx 열기를 지원하지 않습니다'));
+    var ds = new DecompressionStream('deflate-raw');
+    var blob = new Blob([bytes]).stream().pipeThrough(ds);
+    return new Response(blob).arrayBuffer().then(function (b) { return new Uint8Array(b); });
+  }
+
+  function unzip(buf) {
+    var dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+    var eocd = -1;
+    for (var i = buf.length - 22; i >= 0 && i > buf.length - 66000; i--) {
+      if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+    }
+    if (eocd < 0) return Promise.reject(new Error('xlsx(zip) 구조를 찾을 수 없습니다'));
+    var count = dv.getUint16(eocd + 10, true);
+    var off = dv.getUint32(eocd + 16, true);
+    var jobs = [], names = [];
+    for (var n = 0; n < count; n++) {
+      if (dv.getUint32(off, true) !== 0x02014b50) break;
+      var method = dv.getUint16(off + 10, true);
+      var compSize = dv.getUint32(off + 20, true);
+      var nameLen = dv.getUint16(off + 28, true);
+      var extraLen = dv.getUint16(off + 30, true);
+      var commentLen = dv.getUint16(off + 32, true);
+      var localOff = dv.getUint32(off + 42, true);
+      var name = new TextDecoder().decode(buf.subarray(off + 46, off + 46 + nameLen));
+      var start = localOff + 30 + dv.getUint16(localOff + 26, true) + dv.getUint16(localOff + 28, true);
+      var raw = buf.subarray(start, start + compSize);
+      names.push(name);
+      jobs.push(method === 0 ? Promise.resolve(raw) : inflateRaw(raw));
+      off += 46 + nameLen + extraLen + commentLen;
+    }
+    return Promise.all(jobs).then(function (list) {
+      var map = {};
+      names.forEach(function (nm, i) { map[nm] = new TextDecoder('utf-8').decode(list[i]); });
+      return map;
+    });
+  }
+
+  function xdec(s) {
+    return s.replace(/&(#x?[0-9a-fA-F]+|amp|lt|gt|quot|apos);/g, function (m, e) {
+      if (e[0] === '#') return String.fromCodePoint(parseInt(e[1] === 'x' ? e.slice(2) : e.slice(1), e[1] === 'x' ? 16 : 10));
+      return { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" }[e] || m;
+    });
+  }
+  function textOf(xml) {
+    var out = [], re = /<t[^>]*\/>|<t[^>]*>([\s\S]*?)<\/t>/g, m;
+    while ((m = re.exec(xml))) out.push(xdec(m[1] || ''));
+    return out.join('');
+  }
+  function colIndex(ref) {
+    var letters = (ref.match(/^[A-Z]+/) || ['A'])[0], n = 0;
+    for (var i = 0; i < letters.length; i++) n = n * 26 + (letters.charCodeAt(i) - 64);
+    return n - 1;
+  }
+
+  function xlsxRows(files) {
+    var shared = [], ss = files['xl/sharedStrings.xml'], m;
+    if (ss) {
+      var re = /<si>([\s\S]*?)<\/si>/g;
+      while ((m = re.exec(ss))) shared.push(textOf(m[1]));
+    }
+    var sheetKey = Object.keys(files).filter(function (k) { return /^xl\/worksheets\/sheet\d+\.xml$/.test(k); })
+      .sort(function (a, b) { return +a.match(/\d+/)[0] - +b.match(/\d+/)[0]; })[0];
+    if (!sheetKey) throw new Error('워크시트를 찾을 수 없습니다');
+    var xml = files[sheetKey], rows = [], rowRe = /<row[^>]*>([\s\S]*?)<\/row>|<row[^>]*\/>/g, rm;
+    while ((rm = rowRe.exec(xml))) {
+      var body = rm[1] || '', cells = [], cellRe = /<c([^>]*)(?:\/>|>([\s\S]*?)<\/c>)/g, cm;
+      while ((cm = cellRe.exec(body))) {
+        var attrs = cm[1] || '', inner = cm[2] || '';
+        var ref = (attrs.match(/r="([A-Z]+\d+)"/) || [])[1];
+        var type = (attrs.match(/t="([^"]+)"/) || [])[1];
+        var v = (inner.match(/<v>([\s\S]*?)<\/v>/) || [])[1];
+        var value = type === 's' ? (shared[+v] || '') : (type === 'inlineStr' ? textOf(inner) : xdec(v || ''));
+        var idx = ref ? colIndex(ref) : cells.length;
+        while (cells.length < idx) cells.push('');
+        cells[idx] = value;
+      }
+      rows.push(cells);
+    }
+    return rows.filter(function (r) { return r.some(function (c) { return String(c).trim() !== ''; }); });
+  }
+
+  // 테스트/디버깅용 노출
+  window.__kebaImport = { unzip: unzip, xlsxRows: xlsxRows, splitRows: splitRows, toMembers: toMembers };
+
+  document.getElementById('file').addEventListener('change', function (e) {
+    var f = e.target.files && e.target.files[0];
+    if (!f) return;
+    say(f.name + ' 읽는 중…');
+    if (/\.csv$/i.test(f.name)) {
+      f.text().then(function (t) { render(toMembers(splitRows(t, ','))); })
+        .catch(function (err) { say('읽지 못했습니다: ' + err.message, 'err'); });
+      return;
+    }
+    f.arrayBuffer()
+      .then(function (b) { return unzip(new Uint8Array(b)); })
+      .then(function (files) { render(toMembers(xlsxRows(files))); })
+      .catch(function (err) { say('읽지 못했습니다: ' + err.message + ' — 3번 붙여넣기를 이용해 주세요.', 'err'); });
   });
 
   document.getElementById('downloadBtn').addEventListener('click', function () {

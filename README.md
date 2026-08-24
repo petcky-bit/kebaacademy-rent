@@ -128,6 +128,8 @@ wrangler pages deploy dist --project-name webapp
 
 ### 구성
 - `data/members.csv` — 원본 명단 (`기수,이름,학원`)
+- `data/members.xlsx` — 엑셀 명단을 여기에 두면 CSV보다 먼저 사용됩니다
+- `scripts/read-xlsx.mjs` — 외부 라이브러리 없이 .xlsx를 읽는 리더
 - `scripts/make-logo.mjs` — KEBA 엠블럼 SVG 생성
 - `scripts/make-stage.mjs` — 무대(커튼·배너·골드리본) 배경 SVG 생성
 - `scripts/build-cards.mjs` — CSV → 카드 HTML 생성
@@ -141,15 +143,25 @@ wrangler pages deploy dist --project-name webapp
 - 불러오기 도구: `/cards/import.html`
 
 ### 명단 갱신 방법
-1. 브라우저에서 `/cards/import.html` 접속
-2. 구글시트 주소를 넣고 **시트 불러오기** (시트는 “링크가 있는 모든 사용자 - 뷰어” 공유 필요)
-   - 불러오기가 막히면 시트에서 표를 복사해 붙여넣기 칸에 그대로 붙여넣습니다
-3. **members.csv 내려받기** → 프로젝트의 `data/members.csv` 에 덮어쓰기
-4. 터미널에서 재생성
+
+**방법 A — 엑셀 파일이 있을 때 (가장 간단)**
+
+구글시트에서 `파일 > 다운로드 > Microsoft Excel(.xlsx)` 로 받은 파일을
+`data/members.xlsx` 로 저장한 뒤 재생성하면 끝입니다.
 
 ```bash
 npm run cards
 ```
+
+**방법 B — 브라우저에서 불러오기**
+
+1. `/cards/import.html` 접속
+2. 아래 중 하나로 명단을 읽습니다
+   - 구글시트 주소 입력 후 **시트 불러오기** (시트는 “링크가 있는 모든 사용자 - 뷰어” 공유 필요)
+   - **엑셀 파일(.xlsx) 선택** — 브라우저에서 바로 읽습니다
+   - 시트에서 표를 복사해 **붙여넣기**
+3. **members.csv 내려받기** → `data/members.csv` 에 덮어쓰기
+4. `npm run cards`
 
 명단이 6명이면 `card-001.html ~ card-006.html` 이 만들어지고
 목록 페이지와 이전/다음 링크가 모두 자동으로 연결됩니다.
