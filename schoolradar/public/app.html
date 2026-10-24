@@ -1,0 +1,1103 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>School Radar</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+<script>
+  /* 스타일시트 바로 뒤에서 테마를 먼저 붙인다 — 새로고침 때 다크가 번쩍이지 않게. */
+  try {
+    var t = localStorage.getItem('sr-theme');
+    if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+  } catch (e) {}
+</script>
+<script src="catalog.js"></script>
+<style>
+/* app.html 전용. 색은 style.css 의 변수만 쓴다. */
+
+.topbar .search { position: relative; flex: 0 1 280px; min-width: 150px; }
+.topbar .search input { width: 100%; height: 30px; padding: 0 11px; font-size: 13.5px; }
+
+.ac {
+  position: absolute;
+  top: 36px; left: 0;
+  width: min(420px, 78vw);
+  max-height: 340px;
+  overflow: auto;
+  z-index: 50;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+.ac[hidden] { display: none; }
+.ac .it {
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 7px 11px;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+  font-size: 13.5px;
+}
+.ac .it:last-child { border-bottom: 0; }
+.ac .it.on { background: var(--s3); }
+.ac .it .nm { font-weight: 500; }
+.ac .it .ad { color: var(--muted); font-size: 12.5px; margin-left: auto; text-align: right; }
+.ac .none { padding: 12px; color: var(--muted); font-size: 13.5px; }
+
+.head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 4px 0 14px; }
+.head h1 { margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -.02em; }
+.head .meta { color: var(--muted); font-size: 13.5px; }
+.head .sp { flex: 1 1 auto; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 12px; }
+.grid .card { padding: 14px 16px; }
+.grid .card > h2 { font-size: 14.5px; margin-bottom: 8px; }
+.grid table { font-size: 13px; }
+.grid th, .grid td { padding: 5px 0; }
+.grid th { width: 46%; }
+
+/* 파일 카드 */
+.files { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.fcard {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line); border-radius: 10px;
+  background: var(--card); color: var(--text);
+  text-decoration: none;
+  min-width: 0;
+}
+.fcard:hover { border-color: var(--muted); }
+.fcard .ext {
+  flex: 0 0 auto;
+  padding: 2px 7px;
+  border: 1px solid var(--line); border-radius: 6px;
+  background: var(--s2);
+  font-size: 11px; font-weight: 600; color: var(--muted);
+}
+.fcard .tx { min-width: 0; }
+.fcard .nm { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fcard .sub { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 공시 원문 목록 */
+.picks { display: flex; flex-direction: column; }
+.pick {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 9px 2px;
+  border-bottom: 1px solid var(--line);
+}
+.pick:last-child { border-bottom: 0; }
+.pick input { margin: 2px 0 0; flex: 0 0 auto; width: 15px; height: 15px; accent-color: var(--accent); }
+.pick .tx { flex: 1 1 auto; min-width: 0; }
+.pick .t { font-size: 13.5px; }
+.pick .t .cap { margin-left: 6px; color: var(--muted); font-size: 12px; }
+.pick .d { color: var(--muted); font-size: 12.5px; }
+.pick .d b { color: var(--text); font-weight: 600; }
+.pick .st { flex: 0 0 auto; font-size: 12.5px; color: var(--muted); text-align: right; min-width: 78px; }
+.pick .st.ok { color: var(--ok); }
+.pick .st.bad { color: var(--bad); }
+
+.row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.row .sp { flex: 1 1 auto; }
+.mt { margin-top: 12px; }
+
+/* 리포트 */
+.doc {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 12px 2px;
+  border-bottom: 1px solid var(--line);
+}
+.doc:last-of-type { border-bottom: 0; }
+.doc .nm { font-size: 14px; font-weight: 600; flex: 0 0 auto; }
+.doc .by { color: var(--muted); font-size: 12.5px; flex: 0 0 auto; }
+.doc .sp { flex: 1 1 auto; }
+.doc .st { font-size: 12.5px; color: var(--muted); width: 100%; }
+.doc .st b.ok { color: var(--ok); }
+.doc .st b.bad { color: var(--bad); }
+details.log { margin-top: 8px; }
+details.log summary { color: var(--muted); font-size: 12.5px; cursor: pointer; }
+details.log pre { margin-top: 8px; max-height: 300px; font-size: 12px; }
+
+/* 목차 창 */
+.sec { display: flex; align-items: flex-start; gap: 10px; padding: 8px 2px; border-bottom: 1px solid var(--line); }
+.sec:last-child { border-bottom: 0; }
+.sec.off { opacity: .55; }
+.sec input { margin: 2px 0 0; width: 15px; height: 15px; accent-color: var(--accent); }
+.sec .tx { flex: 1 1 auto; min-width: 0; }
+.sec .t { font-size: 13.5px; }
+.sec .t .pg { color: var(--muted); font-size: 12.5px; margin-left: 6px; }
+.sec .n { color: var(--muted); font-size: 12.5px; }
+.sec .n.bad { color: var(--bad); }
+.sec .tag { flex: 0 0 auto; font-size: 12.5px; color: var(--muted); }
+.sec .tag.bad { color: var(--bad); }
+
+.modal .box.wide { max-width: 680px; }
+.cap-img { display: block; margin: 10px auto; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.fields { font-size: 12.5px; }
+.fields th { width: 42%; word-break: break-all; }
+.fields td { word-break: break-all; }
+
+/* 최근 기록 서랍 */
+.drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 60;
+  display: flex; align-items: stretch;
+  transform: translateX(calc(100% - 26px));
+  transition: transform .22s ease;
+}
+.drawer.open, .drawer:hover { transform: translateX(0); }
+.drawer .grip {
+  flex: 0 0 26px;
+  display: flex; align-items: center; justify-content: center;
+  border-left: 1px solid var(--line);
+  background: var(--s2);
+  color: var(--muted);
+  font-size: 11.5px;
+  writing-mode: vertical-rl;
+  letter-spacing: .08em;
+  cursor: pointer;
+  padding: 0;
+  border-top: 0; border-right: 0; border-bottom: 0;
+}
+.drawer .panel {
+  width: 250px;
+  overflow: auto;
+  padding: 14px;
+  border-left: 1px solid var(--line);
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+.drawer .panel h3 { margin: 0 0 10px; font-size: 13.5px; font-weight: 600; }
+.drawer .hit {
+  display: block; width: 100%; text-align: left;
+  padding: 7px 9px; margin-bottom: 5px;
+  border: 1px solid var(--line); border-radius: 8px;
+  background: var(--s2); color: var(--text);
+  font: inherit; font-size: 13px;
+  cursor: pointer;
+}
+.drawer .hit:hover { border-color: var(--muted); }
+.drawer .hit small { display: block; color: var(--muted); font-size: 11.5px; }
+.drawer .empty { color: var(--muted); font-size: 12.5px; }
+
+@media (max-width: 720px) {
+  .drawer { display: none; }
+  .topbar .search { flex: 1 1 140px; }
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="logo" href="app.html">School&nbsp;Radar</a>
+
+  <div class="search">
+    <input id="q" type="search" placeholder="학교 이름" autocomplete="off" spellcheck="false" aria-label="학교 이름 검색">
+    <div class="ac" id="ac" hidden></div>
+  </div>
+
+  <select id="year" aria-label="공시연도">
+    <option>2026</option><option>2025</option><option>2024</option><option>2023</option>
+  </select>
+
+  <span class="spacer"></span>
+
+  <button class="tb-theme" id="theme" type="button" title="테마 바꾸기" aria-label="테마 바꾸기">
+    <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.4M12 19v2.4M2.6 12h2.4M19 12h2.4M5.3 5.3l1.7 1.7M17 17l1.7 1.7M18.7 5.3L17 7M7 17l-1.7 1.7"/></svg>
+    <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.4A8.6 8.6 0 1 1 9.6 3.5a6.9 6.9 0 0 0 10.9 10.9z"/></svg>
+  </button>
+
+  <a class="tb-btn" id="vaultlink" href="vault.html">저장소 —</a>
+  <a class="tb-btn" href="index.html">나가기</a>
+</header>
+
+<div class="wrap">
+  <p class="status" id="status">학교 목록을 불러오는 중…</p>
+
+  <div class="head" id="head" hidden>
+    <h1 id="schoolnm"></h1>
+    <span class="meta" id="schoolmeta"></span>
+    <span class="sp"></span>
+    <button class="btn sm" id="other" type="button">다른 학교</button>
+  </div>
+
+  <div class="grid mt" id="info"></div>
+
+  <!-- 스텝 7 — 이 학교 자료 -->
+  <div class="card mt" id="mine" hidden>
+    <h2>이 학교 자료 <small id="minesub"></small><span class="spacer"></span>
+      <button class="btn sm" id="openfolder" type="button">폴더 열기</button>
+      <a class="btn sm" id="openvault" href="vault.html">저장소에서 열기</a>
+    </h2>
+    <div class="files" id="minefiles"></div>
+  </div>
+
+  <!-- 스텝 8 — 공시 원문 파일 -->
+  <div class="card mt" id="gongsi" hidden>
+    <h2>공시 원문 파일 <small id="gongsisub"></small></h2>
+    <div class="picks" id="picks"></div>
+    <div class="row mt">
+      <button class="btn primary" id="getsel" type="button">선택한 파일 받기</button>
+      <label class="row" style="gap:6px;font-size:13px;color:var(--muted)">
+        <input type="checkbox" id="allpick" style="width:15px;height:15px;accent-color:var(--accent)"> 전체 선택
+      </label>
+      <span class="sp"></span>
+    </div>
+    <p class="g mt" style="font-size:12.5px;margin:10px 0 0">항목당 10초쯤 걸립니다 — 순서대로 받고, 학업성취는 중간에 숫자 확인창이 뜹니다.</p>
+  </div>
+
+  <!-- 스텝 11 — 리포트 -->
+  <div class="card mt" id="reportcard" hidden>
+    <h2>리포트 <small>저장소에 모인 자료로 클로드코드가 PDF 를 만듭니다</small></h2>
+    <div id="docs"></div>
+  </div>
+</div>
+
+<!-- 최근 기록 서랍 -->
+<aside class="drawer" id="drawer">
+  <button class="grip" id="grip" type="button">최근 기록</button>
+  <div class="panel">
+    <h3>최근 기록</h3>
+    <div id="hits"></div>
+    <button class="btn sm mt" id="clearhits" type="button">전체 지우기</button>
+  </div>
+</aside>
+
+<!-- 원본 필드 -->
+<div class="modal" id="rawmodal" hidden>
+  <div class="box wide">
+    <h3 id="rawtitle">원본</h3>
+    <div style="max-height:60vh;overflow:auto"><table class="fields"><tbody id="rawbody"></tbody></table></div>
+    <div class="foot"><button class="btn" data-close type="button">닫기</button></div>
+  </div>
+</div>
+
+<!-- 캡차 -->
+<div class="modal" id="capmodal" hidden>
+  <div class="box">
+    <h3 id="captitle">교과별 학업성취 — 숫자 확인</h3>
+    <p class="g" style="font-size:13px;margin:0">그림에 보이는 숫자를 입력하세요.</p>
+    <img class="cap-img" id="capimg" alt="확인 숫자">
+    <p class="status" id="caperr" hidden></p>
+    <input id="capans" inputmode="numeric" autocomplete="off" style="width:100%" placeholder="숫자">
+    <div class="foot">
+      <button class="btn" id="capskip" type="button">취소</button>
+      <button class="btn primary" id="capok" type="button">받기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 스텝 12 — 목차 -->
+<div class="modal" id="secmodal" hidden>
+  <div class="box wide">
+    <h3 id="sectitle">종합 리포트 목차</h3>
+    <div id="secbody" style="max-height:52vh;overflow:auto"><p class="g">자료를 확인하는 중…</p></div>
+    <p class="status mt" id="secsum" hidden></p>
+    <div class="foot">
+      <button class="btn" id="secfetch" type="button" hidden>부족한 자료 받기</button>
+      <label class="row" style="gap:6px;font-size:13px;color:var(--muted);margin-right:auto">
+        <input type="checkbox" id="secall" style="width:15px;height:15px;accent-color:var(--accent)"> 전체 선택
+      </label>
+      <button class="btn" data-close type="button">닫기</button>
+      <button class="btn primary" id="secgo" type="button">이대로 만들기</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+'use strict';
+
+var $ = function (id) { return document.getElementById(id); };
+var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+  return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+var mb = function (n) { return n >= 1048576 ? (n / 1048576).toFixed(1) + 'MB'
+                      : n >= 1024 ? Math.round(n / 1024) + 'KB' : n + 'B'; };
+
+/* ── 테마 ───────────────────────────────────────────────── */
+$('theme').addEventListener('click', function () {
+  var now = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', now);
+  try { localStorage.setItem('sr-theme', now); } catch (e) {}
+});
+
+/* ── 폴더 id ─────────────────────────────────────────────
+   정본은 api/collect.js 의 folderId 다. 브라우저에서는 require 할 수 없고,
+   규칙을 옮겨 적으면 반드시 어긋난다(제어문자 범위를 공백으로 잘못 읽기 쉽다).
+   그래서 여기서 짓지 않고 서버에 물어본다. */
+function resolveId(nm, y) {
+  return fetch('/api/vault?resolve=1&nm=' + encodeURIComponent(nm) + '&year=' + encodeURIComponent(y))
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      if (!j.ok || !j.id) throw new Error('폴더 이름을 정하지 못했습니다.');
+      return j.id;
+    });
+}
+
+/* ── 상태 ───────────────────────────────────────────────── */
+var SCHOOLS = [];           // { nm, code, sido, sgg, kind, addr, hs, fond, uuid }
+var cur = null;             // 고른 학교
+var curId = null;           // 저장소 폴더 id
+var curDetail = null;       // 저장소 상세
+var seq = 0;                // 늦게 도착한 옛 응답이 새 화면을 덮지 않게
+
+function year() { return $('year').value; }
+function setStatus(html) { $('status').innerHTML = html; }
+
+/* ── 초성 검색 ──────────────────────────────────────────── */
+var CHO = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+function choOf(s) {
+  var out = '';
+  for (var i = 0; i < s.length; i++) {
+    var c = s.charCodeAt(i);
+    if (c >= 0xac00 && c <= 0xd7a3) out += CHO[Math.floor((c - 0xac00) / 588)];
+    else out += s[i];
+  }
+  return out;
+}
+var flat = function (s) { return String(s || '').replace(/\s+/g, '').toLowerCase(); };
+var isCho = function (s) { return /^[ㄱ-ㅎ]+$/.test(s); };
+
+/* ── 학교 목록 ──────────────────────────────────────────── */
+fetch('schools.json').then(function (r) {
+  if (!r.ok) throw new Error('schools.json 을 읽지 못했습니다 (' + r.status + ') — 스텝 3 의 build-schools.js 를 먼저 돌리세요.');
+  return r.json();
+}).then(function (j) {
+  SCHOOLS = (j.rows || []).map(function (r) {
+    return { nm: r[0], code: r[1], sido: r[2], sgg: r[3], kind: r[4],
+             addr: r[5], hs: r[6], fond: r[7], uuid: r[8],
+             _f: flat(r[0]), _c: choOf(flat(r[0])) };
+  });
+  setStatus('전국 <b>' + SCHOOLS.length.toLocaleString() + '</b>개교를 이름만으로 찾을 수 있습니다.');
+  restore();
+}).catch(function (e) {
+  setStatus('<b class="bad">' + esc(e.message) + '</b>');
+});
+
+/* ── 자동완성 ───────────────────────────────────────────── */
+var acRows = [], acAt = -1;
+
+function search(term) {
+  var t = flat(term);
+  if (!t) return [];
+  var cho = isCho(t), out = [];
+  for (var i = 0; i < SCHOOLS.length && out.length < 40; i++) {
+    var s = SCHOOLS[i];
+    if (cho ? s._c.indexOf(t) >= 0 : s._f.indexOf(t) >= 0) out.push(s);
+  }
+  return out;
+}
+
+/* 친 글자를 --mark 로 칠한다. 초성으로 쳤으면 그만큼의 글자를 칠한다. */
+function hilite(nm, term) {
+  var t = flat(term);
+  if (!t) return esc(nm);
+  var hay = isCho(t) ? choOf(flat(nm)) : flat(nm);
+  var at = hay.indexOf(t);
+  if (at < 0) return esc(nm);
+  // flat() 이 지운 공백 때문에 원본 인덱스를 다시 센다
+  var map = [], k = 0;
+  for (var i = 0; i < nm.length; i++) if (!/\s/.test(nm[i])) map[k++] = i;
+  var a = map[at], b = map[Math.min(at + t.length, map.length) - 1];
+  if (a == null || b == null) return esc(nm);
+  return esc(nm.slice(0, a)) + '<mark>' + esc(nm.slice(a, b + 1)) + '</mark>' + esc(nm.slice(b + 1));
+}
+
+function drawAc(term) {
+  acRows = search(term); acAt = -1;
+  var ac = $('ac');
+  if (!term) { ac.hidden = true; ac.innerHTML = ''; return; }
+  if (!acRows.length) { ac.hidden = false; ac.innerHTML = '<div class="none">찾는 학교가 없습니다.</div>'; return; }
+  ac.innerHTML = acRows.map(function (s, i) {
+    return '<div class="it" data-i="' + i + '">' +
+      '<span class="nm">' + hilite(s.nm, term) + '</span>' +
+      '<span class="badge">' + esc(SR.KIND_NM[s.kind] || '?') + '</span>' +
+      '<span class="ad">' + esc(s.addr || '') + '</span></div>';
+  }).join('');
+  ac.hidden = false;
+}
+
+function moveAc(d) {
+  if (!acRows.length) return;
+  acAt = (acAt + d + acRows.length + 1) % (acRows.length + 1);
+  [].forEach.call($('ac').children, function (el, i) { el.classList.toggle('on', i === acAt); });
+  var on = $('ac').children[acAt];
+  if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest' });
+}
+
+$('q').addEventListener('input', function () { drawAc(this.value); });
+$('q').addEventListener('keydown', function (e) {
+  if (e.key === 'ArrowDown') { e.preventDefault(); moveAc(1); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); moveAc(-1); }
+  else if (e.key === 'Enter') {
+    var s = acRows[acAt] || acRows[0];
+    if (s) { e.preventDefault(); pick(s); }
+  } else if (e.key === 'Escape') { $('ac').hidden = true; this.blur(); }
+});
+$('ac').addEventListener('mousedown', function (e) {
+  var it = e.target.closest('.it');
+  if (it) { e.preventDefault(); pick(acRows[+it.dataset.i]); }
+});
+document.addEventListener('click', function (e) {
+  if (!e.target.closest('.search')) $('ac').hidden = true;
+});
+$('other').addEventListener('click', function () { $('q').value = ''; $('q').focus(); drawAc(''); });
+
+/* ── 학교 고르기 ────────────────────────────────────────── */
+function pick(s) {
+  if (!s) return;
+  $('ac').hidden = true;
+  $('q').value = s.nm;
+  cur = s;
+  try { localStorage.setItem('schoolradar.last', JSON.stringify({ nm: s.nm, year: year() })); } catch (e) {}
+  pushHit(s.nm, year());
+  load();
+}
+
+function restore() {
+  var want = new URLSearchParams(location.search).get('school');   // 주소가 먼저다
+  var y = null;
+  if (!want) {
+    try {
+      var last = JSON.parse(localStorage.getItem('schoolradar.last') || 'null');
+      if (last && last.nm) { want = last.nm; y = last.year; }
+    } catch (e) {}
+  }
+  if (y) $('year').value = y;
+  if (!want) return;
+  var hit = SCHOOLS.find(function (s) { return s.nm === want; }) ||
+            SCHOOLS.find(function (s) { return flat(s.nm) === flat(want); });
+  if (hit) pick(hit);
+}
+
+$('year').addEventListener('change', function () {
+  if (!cur) return;
+  try { localStorage.setItem('schoolradar.last', JSON.stringify({ nm: cur.nm, year: year() })); } catch (e) {}
+  pushHit(cur.nm, year());
+  load();
+});
+
+/* 고른 학교와 연도로 화면 전체를 다시 그린다. */
+function load() {
+  var my = ++seq;
+  var s = cur, y = year();
+  curId = null;
+  curDetail = null;
+
+  $('head').hidden = false;
+  $('schoolnm').textContent = s.nm;
+  $('schoolmeta').textContent = [s.fond, s.hs, s.addr].filter(Boolean).join(' · ');
+  $('info').innerHTML = '';
+  setStatus('기본정보를 받는 중…');
+
+  drawPicks();
+
+  resolveId(s.nm, y).then(function (id) {
+    if (my !== seq) return null;
+    curId = id;
+    $('openvault').href = 'vault.html?id=' + encodeURIComponent(id);
+    refreshVault(my);
+    return fetch('/api/collect?what=openapi', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ school: s, year: y }),
+    }).then(function (r) { return r.json(); });
+  }).then(function (j) {
+    if (my !== seq || !j) return;                 // 늦게 온 옛 응답은 버린다
+    if (!j.ok) throw new Error(j.error || '기본정보를 받지 못했습니다.');
+    if (j.id) { curId = j.id; $('openvault').href = 'vault.html?id=' + encodeURIComponent(curId); }
+    drawInfo(j.data || {}, j.items || []);
+    var n = (j.missing || []).length;
+    setStatus('전국 <b>' + SCHOOLS.length.toLocaleString() + '</b>개교를 이름만으로 찾을 수 있습니다.' +
+              (n ? '  미제공 <b class="bad">' + n + '건</b>' : ''));
+    refreshVault(my);
+    refreshDocs();
+  }).catch(function (e) {
+    if (my !== seq) return;
+    setStatus('<b class="bad">' + esc(e.message) + '</b>');
+  });
+}
+
+/* ── 기본정보 카드 ──────────────────────────────────────── */
+var SKIP = { SCHUL_CODE: 1, SCHUL_NM: 1, SIDO_CODE: 1, SGG_CODE: 1, PBAN_YR: 1, SCHUL_KND_CODE: 1 };
+
+function drawInfo(data, items) {
+  var html = items.map(function (it) {
+    var row = data[it.key];
+    if (!row) return '';
+    var keys = Object.keys(row).filter(function (k) { return !SKIP[k] && row[k] !== '' && row[k] != null; });
+    var head = keys.slice(0, 5);
+    return '<div class="card"><h2>' + esc(it.name) + '<span class="spacer"></span>' +
+      '<button class="btn sm" data-raw="' + esc(it.key) + '" type="button">원본</button></h2>' +
+      '<table><tbody>' + head.map(function (k) {
+        return '<tr><th>' + esc(k) + '</th><td>' + esc(row[k]) + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }).join('');
+  $('info').innerHTML = html;
+  $('info').dataset.payload = '';
+  INFO = { data: data, items: items };
+}
+var INFO = null;
+
+$('info').addEventListener('click', function (e) {
+  var b = e.target.closest('[data-raw]');
+  if (!b || !INFO) return;
+  var key = b.dataset.raw;
+  var row = INFO.data[key] || {};
+  var it = INFO.items.find(function (x) { return x.key === key; });
+  $('rawtitle').textContent = (it ? it.name : key) + ' — 원본 필드';
+  $('rawbody').innerHTML = Object.keys(row).map(function (k) {
+    return '<tr><th>' + esc(k) + '</th><td>' + esc(row[k]) + '</td></tr>';
+  }).join('') || '<tr><td class="g">비어 있습니다.</td></tr>';
+  open$('rawmodal');
+});
+
+/* ── 모달 ───────────────────────────────────────────────── */
+function open$(id) { $(id).hidden = false; }
+function close$(id) { $(id).hidden = true; }
+document.addEventListener('click', function (e) {
+  if (e.target.matches('[data-close]')) close$(e.target.closest('.modal').id);
+  else if (e.target.classList.contains('modal')) {
+    if (e.target.id === 'capmodal') capAnswer(null); else close$(e.target.id);
+  }
+});
+
+/* ── 저장소 (스텝 7) ────────────────────────────────────── */
+function refreshVault(my) {
+  fetch('/api/vault').then(function (r) { return r.json(); }).then(function (j) {
+    $('vaultlink').textContent = '저장소 ' + (j.count || 0);
+    var mine = (j.schools || []).find(function (s) { return s.id === curId; });
+    if (my != null && my !== seq) return;
+    curDetail = mine || null;
+    drawMine();
+    drawPickStates();
+    drawDocs();
+  }).catch(function () { $('vaultlink').textContent = '저장소 —'; });
+}
+
+var EXT = { pdf: 'PDF', xls: 'XLS', xlsx: 'XLS', hwp: 'HWP', hwpx: 'HWP', json: 'JSON', csv: 'CSV', md: 'MD' };
+
+function drawMine() {
+  var d = curDetail;
+  if (!d || !d.count) { $('mine').hidden = true; return; }
+  $('mine').hidden = false;
+  $('minesub').textContent = d.count + '개 · ' + mb(d.bytes);
+  $('minefiles').innerHTML = d.files.map(function (f) {
+    return '<a class="fcard" target="_blank" rel="noopener" href="/vault/' +
+      encodeURIComponent(d.id) + '/' + f.path.split('/').map(encodeURIComponent).join('/') + '">' +
+      '<span class="ext">' + esc(EXT[f.ext] || (f.ext || '?').toUpperCase()) + '</span>' +
+      '<span class="tx"><span class="nm">' + esc(f.name) + '</span>' +
+      '<span class="sub">' + esc(f.label || f.kind) + ' · ' + mb(f.size) + '</span></span></a>';
+  }).join('');
+}
+
+$('openfolder').addEventListener('click', function () {
+  if (!curId) return;
+  fetch('/api/vault?id=' + encodeURIComponent(curId) + '&reveal=1', { method: 'POST' });
+});
+
+/* ── 공시 원문 (스텝 8) ─────────────────────────────────── */
+var pickRows = [];
+
+function drawPicks() {
+  if (!cur) return;
+  if (!cur.uuid) { $('gongsi').hidden = true; return; }     // 원문을 열 수 없는 학교
+  pickRows = SR.pickRows(cur.kind, year());
+  $('gongsi').hidden = false;
+  $('gongsisub').textContent = (SR.LV_NAME[cur.kind] || '') + ' 공시 기준 ' + pickRows.length + '개 항목';
+  $('picks').innerHTML = pickRows.map(function (r, i) {
+    return '<div class="pick"><input type="checkbox" checked data-i="' + i + '" id="pk' + i + '">' +
+      '<span class="tx"><label class="t" for="pk' + i + '">' + esc(r.title) +
+      (r.captcha ? '<span class="cap">숫자 입력 필요</span>' : '') + '</label>' +
+      '<span class="d">' + (r.desc || '') + '</span></span>' +
+      '<span class="st" id="st' + i + '"></span></div>';
+  }).join('');
+  syncAll();
+  drawPickStates();
+}
+
+/* '저장됨' 은 브라우저 기록이 아니라 저장소의 files 로 판정한다. */
+function drawPickStates() {
+  if (!pickRows.length) return;
+  var have = SR.doneKeys((curDetail && filesMap(curDetail)) || {});
+  pickRows.forEach(function (r, i) {
+    var st = $('st' + i);
+    if (!st) return;
+    if (have.has(r.key)) { st.textContent = '저장됨'; st.className = 'st ok'; }
+    else if (st.classList.contains('ok')) { st.textContent = ''; st.className = 'st'; }
+  });
+}
+
+function filesMap(d) {
+  var m = {};
+  (d.files || []).forEach(function (f) { m[f.path] = { act: f.act, label: f.label }; });
+  return m;
+}
+
+function checks() { return [].slice.call($('picks').querySelectorAll('input[type=checkbox]')); }
+function syncAll() {
+  var c = checks(), on = c.filter(function (x) { return x.checked; }).length;
+  $('allpick').checked = on === c.length && c.length > 0;
+  $('allpick').indeterminate = on > 0 && on < c.length;
+}
+$('picks').addEventListener('change', syncAll);
+$('allpick').addEventListener('change', function () {
+  var v = this.checked;
+  checks().forEach(function (x) { x.checked = v; });
+  syncAll();
+});
+
+var capPending = null;      // 캡차 대기 — 사람이 숫자를 칠 때까지 받기 흐름을 멈춘다
+
+function capAnswer(v) {
+  var p = capPending; capPending = null;
+  close$('capmodal');
+  if (p) p(v);
+}
+$('capok').addEventListener('click', function () { capAnswer($('capans').value.replace(/\D/g, '')); });
+$('capskip').addEventListener('click', function () { capAnswer(null); });
+$('capans').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('capok').click(); });
+$('capans').addEventListener('input', function () { this.value = this.value.replace(/\D/g, ''); });
+
+function askCaptcha(title, image, err) {
+  $('captitle').textContent = title + ' — 숫자 확인';
+  $('capimg').src = image;
+  $('capans').value = '';
+  $('caperr').hidden = !err;
+  if (err) $('caperr').innerHTML = '<b class="bad">' + esc(err) + '</b>';
+  open$('capmodal');
+  setTimeout(function () { $('capans').focus(); }, 30);
+  return new Promise(function (res) { capPending = res; });
+}
+
+/* Content-Disposition 의 filename*=UTF-8'' 이름을 그대로 쓴다 */
+function nameFrom(res, r) {
+  var cd = res.headers.get('Content-Disposition') || '';
+  var m = /filename\*=UTF-8''([^;]+)/i.exec(cd);
+  if (m) { try { return decodeURIComponent(m[1].trim().replace(/^"|"$/g, '')); } catch (e) {} }
+  m = /filename="?([^";]+)"?/i.exec(cd);
+  if (m) return m[1];
+  return SR.fallbackName(r.act, cur.nm, r.year || year(), 'xls');
+}
+
+function saveRaw(name, bytes, r) {
+  var u = '/api/vault?id=' + encodeURIComponent(curId) +
+          '&kind=raw&name=' + encodeURIComponent(name) +
+          '&act=' + encodeURIComponent(r.act) +
+          '&label=' + encodeURIComponent(SR.pickLabel(r.act, r.year)) +
+          '&year=' + encodeURIComponent(year());       // 폴더는 화면에서 고른 공시연도 하나다
+  return fetch(u, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: bytes })
+    .then(function (x) { return x.json(); });
+}
+
+function gongsiUrl(act, extra) {
+  var p = new URLSearchParams({ act: act, uuid: cur.uuid, name: cur.nm, year: String(extra && extra.year || year()) });
+  if (extra && extra.idx != null) p.set('idx', extra.idx);
+  return '/api/gongsi?' + p.toString();
+}
+
+/** 한 줄을 받는다. 성공하면 받은 개수, 실패하면 throw. */
+async function fetchOne(r, st) {
+  var route = SR.route(r.act);
+  var y = r.year || year();
+
+  if (route === 'collect') {
+    var res = await fetch('/api/collect?what=advance', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ school: cur, year: year() }),
+    });
+    var j = await res.json();
+    if (!j.ok) throw new Error(j.error || '받지 못했습니다.');
+    return 1;                                            // 서버가 저장까지 했다
+  }
+
+  if (route === 'list') {
+    var lr = await fetch(gongsiUrl(r.act, { year: y }));
+    var lj = await lr.json();
+    if (!lj.ok) throw new Error(lj.error || '목록을 받지 못했습니다.');
+    var list = (lj.files || []).filter(function (f) {
+      return r.act === 'evalplan' ? !SR.isRuleTitle(f.title) : true;   // 규정은 rule 이 따로 받는다
+    });
+    if (!list.length) throw new Error('첨부가 없습니다.');
+    var got = 0, bad = 0;
+    for (var i = 0; i < list.length; i++) {
+      st.textContent = '받는 중… ' + (i + 1) + '/' + list.length;
+      try {
+        var fr = await fetch(gongsiUrl(r.act, { year: y, idx: list[i].idx }));
+        if ((fr.headers.get('Content-Type') || '').indexOf('json') >= 0) { bad++; continue; }
+        await saveRaw(nameFrom(fr, r), await fr.arrayBuffer(), r);
+        got++;
+      } catch (e) { bad++; }
+    }
+    if (!got) throw new Error('첨부를 받지 못했습니다.');
+    if (bad) st.dataset.partial = got + '개 받음 · ' + bad + '개 실패';
+    return got;
+  }
+
+  if (route === 'captcha') {
+    var sr = await fetch(gongsiUrl('achieve-start', { year: y }));
+    var sj = await sr.json();
+    if (!sj.ok) throw new Error(sj.error || '확인 절차를 열지 못했습니다.');
+    if (sj.solved && sj.file) {                          // 드물게 확인 없이 바로 온다
+      var bin = Uint8Array.from(atob(sj.file), function (c) { return c.charCodeAt(0); });
+      await saveRaw(sj.filename || SR.fallbackName(r.act, cur.nm, y, 'xls'), bin, r);
+      return 1;
+    }
+    var session = sj.session, image = sj.image, err = null;
+    for (;;) {
+      var ans = await askCaptcha(r.title, image, err);
+      if (ans == null) { st.textContent = '건너뜀'; st.className = 'st'; return 0; }
+      var pr = await fetch('/api/gongsi?act=achieve-solve', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session: session, answer: ans }),
+      });
+      if ((pr.headers.get('Content-Type') || '').indexOf('json') < 0) {
+        await saveRaw(nameFrom(pr, r), await pr.arrayBuffer(), r);
+        return 1;
+      }
+      var pj = await pr.json();
+      if (pj.retry) { session = pj.session; image = pj.image; err = pj.error || '다시 입력해 주세요.'; continue; }
+      throw new Error(pj.error || '확인에 실패했습니다.');
+    }
+  }
+
+  // file
+  var res2 = await fetch(gongsiUrl(r.act, { year: y }));
+  if ((res2.headers.get('Content-Type') || '').indexOf('json') >= 0) {
+    var ej = await res2.json();
+    throw new Error(ej.error || '받지 못했습니다.');
+  }
+  await saveRaw(nameFrom(res2, r), await res2.arrayBuffer(), r);
+  return 1;
+}
+
+var running = false;
+
+async function getSelected(only) {
+  if (running || !cur) return;
+  var want = [];
+  checks().forEach(function (c, i) {
+    if (!c.checked) return;
+    if (only && only.indexOf(pickRows[i].key) < 0) return;
+    want.push(i);
+  });
+  if (!want.length) { setStatus('받을 항목을 하나 이상 고르세요.'); return; }
+
+  running = true;
+  var btn = $('getsel');
+  btn.disabled = true;
+
+  /* 먼저 meta 에 학교 식별자를 남긴다 */
+  await fetch('/api/vault?id=' + encodeURIComponent(curId) + '&meta=1', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ school: cur, year: year() }),
+  }).catch(function () {});
+
+  var have = SR.doneKeys((curDetail && filesMap(curDetail)) || {});
+  var ok = 0, failed = [];
+
+  for (var n = 0; n < want.length; n++) {
+    var i = want[n], r = pickRows[i], st = $('st' + i);
+    btn.textContent = '받는 중… ' + (n + 1) + '/' + want.length;
+
+    if (have.has(r.key)) { st.textContent = '저장됨'; st.className = 'st ok'; ok++; continue; }
+
+    st.textContent = '받는 중…'; st.className = 'st';
+    try {
+      var got = await fetchOne(r, st);                  // 하나씩 순서대로 — 동시에 쏘면 세션이 엉킨다
+      if (got) {
+        st.textContent = st.dataset.partial || '저장됨';
+        st.className = 'st ok';
+        ok++;
+      }
+    } catch (e) {
+      st.textContent = e.message.slice(0, 40);
+      st.className = 'st bad';
+      failed.push(r.title);
+    }
+  }
+
+  btn.textContent = '선택한 파일 받기';
+  btn.disabled = false;
+  running = false;
+
+  setStatus(failed.length
+    ? ok + '건 받았습니다. 못 받은 항목: <b class="bad">' + esc(failed.join(', ')) + '</b>'
+    : '<b class="ok">' + ok + '건 모두 받았습니다.</b> 저장소에 들어갔습니다.');
+
+  pushHit(cur.nm, year());
+  refreshVault();
+  refreshDocs();
+}
+
+$('getsel').addEventListener('click', function () { getSelected(null); });
+
+/* ── 리포트 (스텝 11) ───────────────────────────────────── */
+var DOCS = [
+  { doc: 'brief', nm: '학교 브리프', by: '두 쪽 · 몇 분',
+    idle: 'openapi·진로·성취도만 읽어 빠르게 만듭니다.' },
+  { doc: 'full',  nm: '종합 리포트', by: '스무 쪽 · 수십 분',
+    idle: '규정과 교육과정 첨부까지 열어 스무 쪽으로 만듭니다.' },
+];
+var state = {};              // doc -> 서버 상태
+var polls = {}, ticks = {};  // 문서마다 따로 — 한 벌로 묶으면 한쪽이 끝날 때 다른 쪽도 멈춘다
+
+function hhmmss(ms) {
+  var s = Math.max(0, Math.round(ms / 1000));
+  var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60;
+  var p = function (n) { return String(n).padStart(2, '0'); };
+  return h ? h + ':' + p(m) + ':' + p(x) : p(m) + ':' + p(x);
+}
+
+function drawDocs() {
+  if (!curDetail || !curDetail.count) { $('reportcard').hidden = true; return; }
+  $('reportcard').hidden = false;
+  if ($('docs').children.length) { DOCS.forEach(function (d) { paint(d.doc); }); return; }
+  $('docs').innerHTML = DOCS.map(function (d) {
+    return '<div class="doc" data-doc="' + d.doc + '">' +
+      '<span class="nm">' + esc(d.nm) + '</span><span class="by">' + esc(d.by) + '</span>' +
+      '<span class="sp"></span>' +
+      '<button class="btn sm ' + (d.doc === 'brief' ? 'primary' : '') + '" data-make="' + d.doc + '" type="button">만들기</button>' +
+      '<a class="btn sm" data-pdf="' + d.doc + '" target="_blank" rel="noopener" hidden>PDF 열기</a>' +
+      '<button class="btn sm" data-stop="' + d.doc + '" type="button" hidden>중단</button>' +
+      '<span class="st" data-st="' + d.doc + '"></span>' +
+      '<details class="log" data-log="' + d.doc + '" hidden><summary>진행 기록</summary><pre></pre></details>' +
+      '</div>';
+  }).join('');
+  DOCS.forEach(function (d) { paint(d.doc); });
+}
+
+function q1(sel) { return $('docs').querySelector(sel); }
+
+function paint(doc) {
+  var s = state[doc] || {};
+  var meta = (curDetail && curDetail.docs && curDetail.docs[doc]) || {};
+  var status = s.status || meta.status || 'none';
+  var pdf = (s.report && s.report.pdf) || meta.pdf || null;
+  var d = DOCS.find(function (x) { return x.doc === doc; });
+
+  var make = q1('[data-make="' + doc + '"]');
+  var stop = q1('[data-stop="' + doc + '"]');
+  var link = q1('[data-pdf="' + doc + '"]');
+  var st = q1('[data-st="' + doc + '"]');
+  var log = q1('[data-log="' + doc + '"]');
+  if (!make) return;
+
+  link.hidden = !pdf;
+  if (pdf) link.href = '/vault/' + encodeURIComponent(curId) + '/' + pdf.split('/').map(encodeURIComponent).join('/');
+
+  var run = status === 'running';
+  make.hidden = run;
+  stop.hidden = !run;
+  make.textContent = status === 'done' ? '다시 만들기' : status === 'failed' ? '이어서 만들기' : '만들기';
+
+  if (run) {
+    var began = Date.parse(s.startedAt || meta.startedAt || '') || Date.now();
+    var tail = (s.attempt || 0) >= 2 ? ' (끊겨서 이어서 시도 중 ' + ((s.attempt || 1) - 1) + '/' + (s.retryMax || 3) + ')' : '';
+    st.innerHTML = '만드는 중 <b>' + hhmmss(Date.now() - began) + '</b> 경과 — 이 창을 닫아도 계속됩니다.' + esc(tail);
+  } else if (status === 'done') {
+    var took = (Date.parse(s.endedAt || meta.endedAt || '') || 0) - (Date.parse(s.startedAt || meta.startedAt || '') || 0);
+    st.innerHTML = '<b class="ok">완료</b>' + (took > 0 ? ' — ' + hhmmss(took) + ' 걸렸습니다.' : '') + ' 저장소의 out/ 에 있습니다.';
+  } else if (status === 'failed') {
+    var t2 = (Date.parse(s.endedAt || meta.endedAt || '') || 0) - (Date.parse(s.startedAt || meta.startedAt || '') || 0);
+    st.innerHTML = '<b class="bad">실패</b>' + (t2 > 0 ? ' (' + hhmmss(t2) + ' 만에)' : '') +
+      ' — ' + esc((s.error || meta.error || '')) + ' 「이어서 만들기」를 누르면 남은 단계부터 갑니다.';
+  } else {
+    st.textContent = d.idle;
+  }
+
+  if (s.log) { log.hidden = false; log.querySelector('pre').textContent = s.log; }
+}
+
+function refreshDocs() {
+  if (!curId) return;
+  DOCS.forEach(function (d) {
+    fetch('/api/report?id=' + encodeURIComponent(curId) + '&doc=' + d.doc)
+      .then(function (r) { return r.json(); }).then(function (j) {
+        state[d.doc] = j;
+        paint(d.doc);
+        if (j.status === 'running') watch(d.doc); else unwatch(d.doc);
+      }).catch(function () {});
+  });
+}
+
+function watch(doc) {
+  if (!polls[doc]) polls[doc] = setInterval(function () {
+    fetch('/api/report?id=' + encodeURIComponent(curId) + '&doc=' + doc)
+      .then(function (r) { return r.json(); }).then(function (j) {
+        state[doc] = j;
+        paint(doc);
+        if (j.status !== 'running') { unwatch(doc); refreshVault(); }
+      }).catch(function () {});
+  }, 3000);
+  /* 몇 십 분짜리라 경과 시간이 없으면 멈춘 것과 구분이 안 된다. 1초마다 올린다. */
+  if (!ticks[doc]) ticks[doc] = setInterval(function () { paint(doc); }, 1000);
+}
+function unwatch(doc) {
+  clearInterval(polls[doc]); polls[doc] = null;
+  clearInterval(ticks[doc]); ticks[doc] = null;
+}
+
+$('docs').addEventListener('click', function (e) {
+  var mk = e.target.closest('[data-make]');
+  var sp = e.target.closest('[data-stop]');
+  if (mk) {
+    var doc = mk.dataset.make;
+    if (doc === 'full') { openSections(); return; }      // 종합은 목차 창을 먼저 (스텝 12)
+    start(doc, null, mk);
+  } else if (sp) {
+    fetch('/api/report?id=' + encodeURIComponent(curId) + '&doc=' + sp.dataset.stop, { method: 'DELETE' })
+      .then(function () { refreshDocs(); });
+  }
+});
+
+function start(doc, sections, btn) {
+  if (btn) { btn.textContent = '시작하는 중…'; btn.disabled = true; }
+  fetch('/api/report?id=' + encodeURIComponent(curId) + '&doc=' + doc, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(sections ? { sections: sections } : {}),
+  }).then(function (r) { return r.json(); }).then(function (j) {
+    if (btn) btn.disabled = false;
+    if (!j.ok && j.error) { setStatus('<b class="bad">' + esc(j.error) + '</b>'); paint(doc); return; }
+    state[doc] = j; paint(doc); watch(doc);
+  }).catch(function () { if (btn) btn.disabled = false; paint(doc); });
+}
+
+/* ── 목차 창 (스텝 12) ──────────────────────────────────── */
+var secRows = [];
+
+function openSections() {
+  open$('secmodal');
+  $('sectitle').textContent = cur.nm + ' · ' + year() + '년 공시 — 종합 리포트 목차';
+  $('secbody').innerHTML = '<p class="g">자료를 확인하는 중…</p>';
+  $('secsum').hidden = true;
+  fetch('/api/vault?id=' + encodeURIComponent(curId)).then(function (r) { return r.json(); })
+    .then(function (d) { curDetail = d.id ? d : curDetail; drawSections(); })
+    .catch(function () { drawSections(); });
+}
+
+function drawSections() {
+  var have = SR.doneKeys((curDetail && filesMap(curDetail)) || {});
+  secRows = SR.sectionRows(cur.kind, have, year());
+
+  $('secbody').innerHTML = secRows.map(function (s, i) {
+    var miss = (s.missing || []).map(function (m) {
+      return SR.actTitle(m.act) + (m.years && m.years.length ? ' ' + m.years.join('·') + '년' : '');
+    }).join(', ');
+    return '<div class="sec' + (s.ready ? '' : ' off') + '">' +
+      '<input type="checkbox" id="sc' + i + '" data-i="' + i + '"' + (s.on ? ' checked' : '') + '>' +
+      '<span class="tx"><label class="t" for="sc' + i + '">' + esc(s.t) +
+      '<span class="pg">' + esc(s.pg) + '</span></label>' +
+      (miss ? '<span class="n bad">받아야 할 자료 — ' + esc(miss) + '</span>'
+            : s.note ? '<span class="n">' + esc(s.note) + '</span>' : '') +
+      '</span>' +
+      '<span class="tag' + (s.ready ? '' : ' bad') + '">' + (s.ready ? '준비됨' : '자료 없음') + '</span></div>';
+  }).join('');
+
+  var off = secRows.filter(function (s) { return !s.ready; }).length;
+  var on = secRows.filter(function (s) { return s.on; }).length;
+  $('secsum').hidden = false;
+  $('secsum').innerHTML = off
+    ? '전체 ' + secRows.length + '개 절 가운데 <b>' + on + '개</b>를 만듭니다. 자료가 없어 꺼 둔 절이 <b class="bad">' + off + '개</b> 있습니다.'
+    : '<b class="ok">필요한 자료가 모두 있습니다.</b>';
+
+  var need = missingKeys();
+  $('secfetch').hidden = !need.length;
+  $('secfetch').textContent = '부족한 자료 ' + need.length + '개 항목 받기';
+  syncSecAll();
+}
+
+function missingKeys() {
+  var out = {};
+  secRows.forEach(function (s) {
+    (s.missing || []).forEach(function (m) {
+      if (m.years && m.years.length) m.years.forEach(function (y) { out[SR.pickKey(m.act, y)] = 1; });
+      else out[SR.pickKey(m.act)] = 1;
+    });
+  });
+  return Object.keys(out);
+}
+
+function secChecks() { return [].slice.call($('secbody').querySelectorAll('input[type=checkbox]')); }
+function syncSecAll() {
+  var c = secChecks(), on = c.filter(function (x) { return x.checked; }).length;
+  $('secall').checked = on === c.length && c.length > 0;
+  $('secall').indeterminate = on > 0 && on < c.length;
+}
+$('secbody').addEventListener('change', syncSecAll);
+$('secall').addEventListener('change', function () {
+  var v = this.checked;
+  secChecks().forEach(function (x) { x.checked = v; });
+  syncSecAll();
+});
+
+/* 스텝 8 의 받기 경로를 그대로 태운다 — 캡차·첨부 여러 개 같은 예외가 전부 거기 있다. */
+$('secfetch').addEventListener('click', async function () {
+  var need = missingKeys();
+  var inPicks = need.filter(function (k) {
+    return pickRows.some(function (r) { return r.key === k; });
+  });
+  if (!inPicks.length) {
+    $('secsum').innerHTML = '<b class="bad">OpenAPI 수집 결과가 없습니다 — 위에서 학교를 한 번 다시 조회해 주세요.</b>';
+    return;
+  }
+  checks().forEach(function (c, i) { c.checked = inPicks.indexOf(pickRows[i].key) >= 0; });
+  syncAll();
+  close$('secmodal');
+  await getSelected(inPicks);
+  openSections();
+});
+
+$('secgo').addEventListener('click', function () {
+  var on = [];
+  secChecks().forEach(function (c, i) { if (c.checked) on.push(i); });
+  if (!on.length) { $('secsum').innerHTML = '<b class="bad">만들 절을 하나 이상 고르세요.</b>'; return; }
+  /* 안 고른 절도 같이 보낸다 — 자료가 없어 빠진 것과 일부러 뺀 것을 구분할 수 있어야 한다. */
+  var sections = secRows.map(function (s, i) { return { t: s.t, pg: s.pg, on: on.indexOf(i) >= 0 }; });
+  close$('secmodal');
+  start('full', sections, q1('[data-make="full"]'));
+});
+
+/* ── 최근 기록 (스텝 6) ─────────────────────────────────── */
+function hits() {
+  try { return JSON.parse(localStorage.getItem('schoolradar.history') || '[]'); } catch (e) { return []; }
+}
+function pushHit(nm, y) {
+  var all = hits().filter(function (h) { return !(h.nm === nm && String(h.year) === String(y)); });
+  all.unshift({ nm: nm, year: String(y), at: Date.now() });
+  try { localStorage.setItem('schoolradar.history', JSON.stringify(all.slice(0, 40))); } catch (e) {}
+  drawHits();
+}
+function drawHits() {
+  var all = hits();
+  $('hits').innerHTML = all.length ? all.map(function (h, i) {
+    return '<button class="hit" data-i="' + i + '" type="button">' + esc(h.nm) +
+      '<small>' + esc(h.year) + '년 공시</small></button>';
+  }).join('') : '<p class="empty">아직 조회한 학교가 없습니다.</p>';
+}
+$('hits').addEventListener('click', function (e) {
+  var b = e.target.closest('.hit');
+  if (!b) return;
+  var h = hits()[+b.dataset.i];
+  if (!h) return;
+  var s = SCHOOLS.find(function (x) { return x.nm === h.nm; });
+  if (!s) return;
+  $('year').value = h.year;
+  pick(s);
+});
+$('clearhits').addEventListener('click', function () {
+  try { localStorage.removeItem('schoolradar.history'); } catch (e) {}
+  drawHits();
+});
+$('grip').addEventListener('click', function () { $('drawer').classList.toggle('open'); });
+drawHits();
+
+})();
+</script>
+</body>
+</html>

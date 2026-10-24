@@ -1,0 +1,25 @@
+# 씨앗 꾸러미 — 스텝 0 의 zip 에서 받는다. 「짓지 않고 받는 코드」라 리포에 두지 않는다.
+# docs/template 에는 특정 학교의 실제 수치가 예시로 들어 있다.
+README.md
+package.json
+package-lock.json
+regions.json
+build-schools.js
+build-kess.js
+api/gongsi.js
+api/schoolinfo.js
+api/collect.js
+public/catalog.js
+public/favicon.svg
+public/favicon-32.png
+public/apple-touch-icon.png
+docs/
+prompts/
+
+# 생성물
+node_modules/
+vault/
+.kess-cache/
+.scratch/
+public/schools.json
+public/kess*.json

@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>School Radar — 저장소</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+<script>
+  try {
+    var t = localStorage.getItem('sr-theme');
+    if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+  } catch (e) {}
+</script>
+<style>
+.root { color: var(--muted); font-size: 12.5px; margin: 0 0 14px; word-break: break-all; }
+
+.folders { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.folder {
+  display: block; width: 100%; text-align: left;
+  padding: 14px 16px;
+  border: 1px solid var(--line); border-radius: 12px;
+  background: var(--card); color: var(--text);
+  font: inherit; cursor: pointer;
+}
+.folder:hover { border-color: var(--muted); }
+.folder .nm { display: flex; align-items: baseline; gap: 7px; font-size: 15px; font-weight: 600; }
+.folder .sub { color: var(--muted); font-size: 12.5px; margin-top: 6px; }
+.folder .tags { margin-top: 9px; }
+
+.files { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+.fcard {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line); border-radius: 10px;
+  background: var(--card);
+  min-width: 0;
+}
+.fcard .ext {
+  flex: 0 0 auto; padding: 2px 7px;
+  border: 1px solid var(--line); border-radius: 6px; background: var(--s2);
+  font-size: 11px; font-weight: 600; color: var(--muted);
+}
+.fcard .tx { flex: 1 1 auto; min-width: 0; }
+.fcard .nm { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fcard .nm a { color: var(--text); text-decoration: none; }
+.fcard .nm a:hover { color: var(--accent); }
+.fcard .sub { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fcard .acts { flex: 0 0 auto; display: flex; gap: 5px; }
+
+.row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.row .sp { flex: 1 1 auto; }
+.mt { margin-top: 14px; }
+
+.head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 0 0 14px; }
+.head h1 { margin: 0; font-size: 21px; font-weight: 650; letter-spacing: -.02em; }
+.head .meta { color: var(--muted); font-size: 13.5px; }
+
+iframe.pv { width: 100%; height: 72vh; margin-top: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--s2); }
+.danger { color: var(--bad); }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="logo" href="app.html">School&nbsp;Radar</a>
+  <span class="spacer"></span>
+  <button class="tb-theme" id="theme" type="button" title="테마 바꾸기" aria-label="테마 바꾸기">
+    <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.4M12 19v2.4M2.6 12h2.4M19 12h2.4M5.3 5.3l1.7 1.7M17 17l1.7 1.7M18.7 5.3L17 7M7 17l-1.7 1.7"/></svg>
+    <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.4A8.6 8.6 0 1 1 9.6 3.5a6.9 6.9 0 0 0 10.9 10.9z"/></svg>
+  </button>
+  <a class="tb-btn" href="app.html">학교 조회</a>
+  <a class="tb-btn" href="index.html">나가기</a>
+</header>
+
+<div class="wrap">
+  <p class="root" id="root"></p>
+  <div id="view"></div>
+</div>
+
+<!-- 폴더 삭제 확인 -->
+<div class="modal" id="delmodal" hidden>
+  <div class="box">
+    <h3>이 폴더를 삭제합니다</h3>
+    <p class="g" id="deltarget" style="font-size:13px"></p>
+    <p class="status"><b class="bad">되돌릴 수 없습니다.</b> 받은 원문과 만들어 둔 PDF 가 함께 사라집니다.</p>
+    <p class="g" style="font-size:13px;margin:12px 0 6px">계속하려면 아래에 <b>삭제하겠습니다</b> 를 그대로 입력하세요.</p>
+    <input id="delword" autocomplete="off" style="width:100%" placeholder="삭제하겠습니다">
+    <div class="foot">
+      <button class="btn" data-close type="button">취소</button>
+      <button class="btn" id="delgo" type="button" disabled>삭제</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+'use strict';
+
+var $ = function (id) { return document.getElementById(id); };
+var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+  return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+var mb = function (n) { return n >= 1048576 ? (n / 1048576).toFixed(1) + 'MB'
+                      : n >= 1024 ? Math.round(n / 1024) + 'KB' : n + 'B'; };
+var KIND = { '02': '초', '03': '중', '04': '고' };
+var EXT = { pdf: 'PDF', xls: 'XLS', xlsx: 'XLS', hwp: 'HWP', hwpx: 'HWP', json: 'JSON', csv: 'CSV', md: 'MD' };
+
+$('theme').addEventListener('click', function () {
+  var now = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', now);
+  try { localStorage.setItem('sr-theme', now); } catch (e) {}
+});
+
+function when(iso) {
+  if (!iso) return '';
+  var d = new Date(iso);
+  if (isNaN(d)) return '';
+  var p = function (n) { return String(n).padStart(2, '0'); };
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+
+/* 리포트 상태 태그 */
+function tag(d) {
+  var s = (d.docs && d.docs.full && d.docs.full.status) || 'none';
+  if (s === 'done') return '<span class="badge on">리포트 완료</span>';
+  if (s === 'running') return '<span class="badge">만드는 중</span>';
+  if (s === 'failed') return '<span class="badge" style="color:var(--bad);border-color:var(--bad)">리포트 실패</span>';
+  return '<span class="badge">리포트 없음</span>';
+}
+
+var vurl = function (id, p) {
+  return '/vault/' + encodeURIComponent(id) + '/' + p.split('/').map(encodeURIComponent).join('/');
+};
+
+/* ── 목록 화면 ──────────────────────────────────────────── */
+function drawList(j) {
+  $('root').textContent = j.root || '';
+  if (!j.count) {
+    $('view').innerHTML = '<div class="card"><h2>저장소가 비어 있습니다</h2>' +
+      '<p class="g">학교를 조회하고 공시 원문을 받으면 여기에 폴더가 쌓입니다.</p>' +
+      '<p class="mt"><a class="btn primary" href="app.html">학교 조회하러 가기</a></p></div>';
+    return;
+  }
+  $('view').innerHTML =
+    '<div class="row" style="margin-bottom:12px"><span class="g" style="font-size:13.5px">' +
+      j.count + '개 학교 · ' + mb(j.bytes) + '</span><span class="sp"></span>' +
+      '<button class="btn sm" id="openroot" type="button">폴더 열기</button></div>' +
+    '<div class="folders">' + j.schools.map(function (d) {
+      var s = d.school || {};
+      return '<button class="folder" data-id="' + esc(d.id) + '" type="button">' +
+        '<span class="nm"><span class="badge">' + esc(KIND[s.kind] || '?') + '</span>' +
+        esc(s.nm || d.id) + '</span>' +
+        '<span class="sub">' + esc(d.year || '') + '년 공시 · ' + d.count + '개 · ' + mb(d.bytes) +
+        '<br>갱신 ' + esc(when(d.updated)) + '</span>' +
+        '<span class="tags">' + tag(d) + '</span></button>';
+    }).join('') + '</div>';
+
+  $('openroot').addEventListener('click', function () {
+    fetch('/api/vault?id=__root__&reveal=1', { method: 'POST' });
+  });
+  $('view').addEventListener('click', function (e) {
+    var f = e.target.closest('.folder');
+    if (f) go(f.dataset.id);
+  });
+}
+
+/* ── 폴더 화면 ──────────────────────────────────────────── */
+function drawOne(d) {
+  $('root').textContent = d.path || '';
+  var s = d.school || {};
+  var pdf = (d.docs && d.docs.full && d.docs.full.pdf) || (d.docs && d.docs.brief && d.docs.brief.pdf) || null;
+
+  $('view').innerHTML =
+    '<div class="head"><h1>' + esc(s.nm || d.id) + '</h1>' +
+      '<span class="meta">' + esc(d.year || '') + '년 공시 · ' + d.count + '개 · ' + mb(d.bytes) + '</span>' +
+      '<span class="meta">' + tag(d) + '</span></div>' +
+    (d.count ? '<div class="files">' + d.files.map(function (f) {
+      return '<div class="fcard">' +
+        '<span class="ext">' + esc(EXT[f.ext] || (f.ext || '?').toUpperCase()) + '</span>' +
+        '<span class="tx"><span class="nm"><a href="' + vurl(d.id, f.path) + '" target="_blank" rel="noopener">' +
+          esc(f.name) + '</a></span>' +
+        '<span class="sub">' + esc(f.label || f.kind) + ' · ' + mb(f.size) + '</span></span>' +
+        '<span class="acts">' +
+          '<button class="btn sm" data-reveal="' + esc(f.path) + '" type="button">폴더</button>' +
+          '<a class="btn sm" href="' + vurl(d.id, f.path) + '?dl=1">받기</a>' +
+          '<button class="btn sm" data-del="' + esc(f.path) + '" type="button">삭제</button>' +
+        '</span></div>';
+    }).join('') + '</div>'
+      : '<p class="status">이 폴더에 파일이 없습니다.</p>') +
+    '<div class="row mt">' +
+      '<button class="btn sm" id="openf" type="button">폴더 열기</button>' +
+      '<a class="btn sm" href="app.html?school=' + encodeURIComponent(s.nm || '') + '">이 학교 다시 조회</a>' +
+      (pdf ? '<button class="btn sm" id="preview" type="button">리포트 미리보기</button>' : '') +
+      '<span class="sp"></span>' +
+      '<button class="btn sm danger" id="delfolder" type="button">이 폴더 삭제</button>' +
+    '</div>' +
+    '<div id="pvwrap"></div>';
+
+  $('openf').addEventListener('click', function () {
+    fetch('/api/vault?id=' + encodeURIComponent(d.id) + '&reveal=1', { method: 'POST' });
+  });
+
+  if (pdf) $('preview').addEventListener('click', function () {
+    var w = $('pvwrap');
+    if (w.firstChild) { w.innerHTML = ''; this.textContent = '리포트 미리보기'; return; }
+    w.innerHTML = '<iframe class="pv" src="' + vurl(d.id, pdf) + '" title="리포트 미리보기"></iframe>';
+    this.textContent = '미리보기 닫기';
+  });
+
+  $('view').addEventListener('click', function (e) {
+    var rv = e.target.closest('[data-reveal]');
+    var dl = e.target.closest('[data-del]');
+    if (rv) {
+      fetch('/api/vault?id=' + encodeURIComponent(d.id) + '&reveal=1&file=' +
+            encodeURIComponent(rv.dataset.reveal), { method: 'POST' });
+    } else if (dl) {
+      if (!confirm('이 파일을 지웁니다.\n\n' + dl.dataset.del)) return;    // 파일 하나는 확인 한 번
+      fetch('/api/vault?id=' + encodeURIComponent(d.id) + '&file=' +
+            encodeURIComponent(dl.dataset.del), { method: 'DELETE' })
+        .then(function () { go(d.id); });
+    }
+  });
+
+  $('delfolder').addEventListener('click', function () { askDelete(d); });
+}
+
+/* ── 폴더 삭제 — "삭제하겠습니다" 를 그대로 쳐야 열린다 ── */
+var delId = null;
+function askDelete(d) {
+  delId = d.id;
+  $('deltarget').textContent = d.path || d.id;
+  $('delword').value = '';
+  $('delgo').disabled = true;
+  $('delmodal').hidden = false;
+  setTimeout(function () { $('delword').focus(); }, 30);
+}
+$('delword').addEventListener('input', function () {
+  $('delgo').disabled = this.value.trim() !== '삭제하겠습니다';
+});
+$('delgo').addEventListener('click', function () {
+  if (!delId) return;
+  fetch('/api/vault?id=' + encodeURIComponent(delId), { method: 'DELETE' })
+    .then(function () { $('delmodal').hidden = true; go(null); });
+});
+document.addEventListener('click', function (e) {
+  if (e.target.matches('[data-close]')) e.target.closest('.modal').hidden = true;
+  else if (e.target.classList.contains('modal')) e.target.hidden = true;
+});
+
+/* ── 라우팅 — ?id= 로 바꿔 뒤로가기가 먹게 ─────────────── */
+function render(id) {
+  $('view').innerHTML = '<p class="status">읽는 중…</p>';
+  var u = id ? '/api/vault?id=' + encodeURIComponent(id) : '/api/vault';
+  fetch(u).then(function (r) { return r.json(); }).then(function (j) {
+    if (j.ok === false) throw new Error(j.error || '읽지 못했습니다.');
+    if (id) drawOne(j); else drawList(j);
+  }).catch(function (e) {
+    $('view').innerHTML = '<p class="status"><b class="bad">' + esc(e.message) + '</b></p>' +
+      '<p class="mt"><a class="btn" href="vault.html">저장소 목록으로</a></p>';
+  });
+}
+
+function go(id) {
+  var u = id ? 'vault.html?id=' + encodeURIComponent(id) : 'vault.html';
+  history.pushState({ id: id || null }, '', u);
+  render(id);
+}
+window.addEventListener('popstate', function (e) {
+  render((e.state && e.state.id) || new URLSearchParams(location.search).get('id'));
+});
+
+render(new URLSearchParams(location.search).get('id'));
+
+})();
+</script>
+</body>
+</html>
