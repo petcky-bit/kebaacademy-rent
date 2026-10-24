@@ -38,6 +38,23 @@ if not exist "node_modules\" (
   echo.
 )
 
+findstr /C:"const API_KEY = '여기에_인증키'" api\schoolinfo.js >nul 2>&1
+if not errorlevel 1 (
+  echo   인증키가 아직 없습니다. 먼저 "색인만들기.bat" 을 실행하세요.
+  echo   거기에 발급 방법이 적혀 있습니다.
+  echo.
+  pause
+  exit /b 1
+)
+
+if not exist "public\schools.json" (
+  echo   학교 색인이 아직 없습니다. 먼저 "색인만들기.bat" 을 실행하세요.
+  echo   그걸 돌려야 학교 검색이 됩니다. 1년에 한 번이면 충분합니다.
+  echo.
+  pause
+  exit /b 1
+)
+
 echo   브라우저가 곧 열립니다.  http://localhost:3000
 echo   이 검은 창을 닫으면 스쿨레이더가 멈춥니다.
 echo.
