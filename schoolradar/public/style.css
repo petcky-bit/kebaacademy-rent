@@ -1,0 +1,430 @@
+/* 스쿨레이더 — 화면 전체의 색과 서식
+ *
+ * 기본은 다크. 표면을 밝기로 층층이 쌓지 않는다.
+ * 배경 · 카드 · 입력칸이 전부 같은 색이고, 경계는 오직 1px 선이 만든다.
+ * 색이 하나뿐이라 화면이 조용해지고, 정작 눈에 띄어야 할 초록이 산다.
+ *
+ * 이 파일 밖에서는 색을 직접 쓰지 말고 변수만 쓴다. 새 색을 지어내지 않는다.
+ * Inter 글꼴은 각 페이지가 구글 폰트에서 불러온다.
+ */
+
+/* ── 다크 (기본) ───────────────────────────────────────────── */
+:root {
+  --bg: #151515;
+  --card: #151515;
+  --s2: #151515;
+  --line: #2c2c2c;
+
+  --text: #e6e9ec;
+  --muted: #98a1a9;
+
+  --accent: #22c55e;
+  --accent-bg: #12271a;
+  --accent-fg: #04140a;
+
+  --lime: #34d97a;
+  --ink: #0b0d0f;
+  --note-bg: #1d1c14;
+
+  --ok: #34d97a;
+  --bad: #f87171;
+
+  --s3: #1d1d1d;                      /* 지금 가리키는 줄 — 유일하게 다른 값 */
+  --mark: rgba(198, 242, 78, .55);
+  --shadow: 0 18px 40px rgba(0, 0, 0, .55);
+
+  --tb-1: #151515;
+  --tb-2: #151515;
+  --tb-fg: #e6e9ec;
+  --tb-line: #2c2c2c;
+  --tb-btn-fg: #c4cbd1;
+  --tb-btn-line: #2c2c2c;
+  --tb-btn-bg: rgba(255, 255, 255, .05);
+
+  color-scheme: dark;
+}
+
+/* ── 라이트 — 같은 이름의 변수만 갈아 끼운다. 규칙을 두 벌 쓰지 않는다. ── */
+html[data-theme="light"] {
+  --bg: #f4f6f5;
+  --card: #fff;
+  --s2: #f0f3f1;
+  --line: #dde3df;
+
+  --text: #14181b;
+  --muted: #5b6862;
+
+  --accent: #16a34a;
+  --accent-bg: #e6f6ec;
+  --accent-fg: #fff;
+
+  --lime: #15803d;
+  --ink: #0b0d0f;
+  --note-bg: #fdf6e3;
+
+  --ok: #15803d;
+  --bad: #dc2626;
+
+  --s3: #e6ebe8;
+  --mark: rgba(34, 197, 94, .28);
+  --shadow: 0 14px 34px rgba(18, 33, 26, .14);
+
+  --tb-1: #fff;
+  --tb-2: #fbfbfc;
+  --tb-fg: #18181b;
+  --tb-line: #e2e5e3;
+  --tb-btn-fg: #52565b;
+  --tb-btn-line: #e2e5e3;
+  --tb-btn-bg: #f2f4f3;
+
+  color-scheme: light;
+}
+
+/* ── 바탕 ─────────────────────────────────────────────────── */
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Inter", "Pretendard", system-ui, -apple-system, "Malgun Gothic", "맑은 고딕", sans-serif;
+  font-feature-settings: "cv05", "ss01", "tnum";
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+a { color: var(--accent); }
+
+/* 수치는 자리를 맞춘다 */
+table, pre, code, th, td,
+.num, .status, input, select, textarea, button {
+  font-variant-numeric: tabular-nums;
+}
+
+code, pre, kbd {
+  font-family: ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace;
+}
+
+pre {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--s2);
+  font-size: 13px;
+  overflow: auto;
+}
+
+/* 친 글자 표시. 글자색은 --ink — 두 테마 모두 --mark 위에서 또렷하다. */
+mark, .mark {
+  padding: 0;
+  background: var(--mark);
+  color: var(--ink);
+  border-radius: 2px;
+}
+
+/* 흐린 보조글 */
+.g { color: var(--muted); }
+
+hr {
+  height: 0;
+  margin: 18px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+/* 입력칸도 배경과 같은 색. 경계는 1px 선뿐이다. */
+input, select, textarea {
+  padding: 7px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--s2);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+::placeholder { color: var(--muted); }
+
+/* ── 상단 막대 — 화면 위에 붙어 따라오고, 아래 1px 선 하나로 떠 있음을 알린다 ── */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 0 18px;
+  background: linear-gradient(var(--tb-1), var(--tb-2));
+  color: var(--tb-fg);
+  border-bottom: 1px solid var(--tb-line);
+}
+
+.topbar .logo {
+  font-weight: 700;
+  font-size: 15.5px;
+  letter-spacing: -.01em;
+  color: var(--tb-fg);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.topbar .spacer { flex: 1 1 auto; min-width: 0; }
+
+.topbar a { color: var(--tb-btn-fg); text-decoration: none; }
+.topbar a:hover { color: var(--tb-fg); }
+
+/* 막대 안의 작은 단추들 — 테마 버튼과 같은 옷을 입는다 */
+.topbar .tb-btn,
+.tb-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 11px;
+  border: 1px solid var(--tb-btn-line);
+  border-radius: 8px;
+  background: var(--tb-btn-bg);
+  color: var(--tb-btn-fg);
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tb-btn:hover { color: var(--tb-fg); border-color: var(--muted); }
+
+/* ── 테마 버튼 — 달과 해를 둘 다 두고 data-theme 를 보고 하나만 보인다 ── */
+.tb-theme {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--tb-btn-line);
+  border-radius: 8px;
+  background: var(--tb-btn-bg);
+  color: var(--tb-btn-fg);
+  cursor: pointer;
+}
+
+.tb-theme:hover { color: var(--tb-fg); border-color: var(--muted); }
+
+.tb-theme svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* 누르면 바뀔 쪽을 보여 준다 — 다크에서는 해, 라이트에서는 달 */
+.tb-theme .i-moon { display: none; }
+.tb-theme .i-sun { display: block; }
+html[data-theme="light"] .tb-theme .i-sun { display: none; }
+html[data-theme="light"] .tb-theme .i-moon { display: block; }
+
+/* ── 버튼 ─────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--s2);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.btn:hover { border-color: var(--muted); }
+
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  opacity: .5;
+  cursor: default;
+}
+
+.btn:disabled:hover,
+.btn[aria-disabled="true"]:hover { border-color: var(--line); }
+
+.btn.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-weight: 600;
+}
+
+.btn.primary:hover {
+  border-color: var(--lime);
+  background: var(--lime);
+}
+
+.btn.sm {
+  padding: 4px 10px;
+  border-radius: 7px;
+  font-size: 13px;
+}
+
+/* ── 카드 ─────────────────────────────────────────────────── */
+.card {
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+}
+
+.card + .card { margin-top: 14px; }
+
+.card > h2 {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -.01em;
+}
+
+/* 제목 옆 small 은 흐린 글씨 */
+.card > h2 small {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.card > h2 .spacer { flex: 1 1 auto; }
+
+/* ── 상태줄 ───────────────────────────────────────────────── */
+.status {
+  padding: 9px 13px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--note-bg);
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.status b { font-weight: 600; }
+.status b.ok { color: var(--ok); }
+.status b.bad { color: var(--bad); }
+
+/* ── 표 ───────────────────────────────────────────────────── */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+th, td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover { background: var(--s3); }
+
+/* 지금 가리키는 줄 */
+.row-on,
+[aria-selected="true"] { background: var(--s3); }
+
+/* ── 모달 — 가운데 상자, 뒤는 어둡게 ───────────────────────── */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  /* 뒤는 어둡게. 목록에 있는 --ink 만 쓴다. */
+  background: color-mix(in srgb, var(--ink) 68%, transparent);
+}
+
+.modal[hidden] { display: none; }
+
+.modal > .box,
+.modal > .card {
+  width: 100%;
+  max-width: 520px;
+  max-height: 86vh;
+  padding: 20px 22px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+  overflow: auto;
+}
+
+.modal h3 {
+  margin: 0 0 10px;
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.modal .foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+/* ── 배지 ─────────────────────────────────────────────────── */
+.badge {
+  display: inline-block;
+  padding: 1px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--s2);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+.badge.on {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+/* ── 본문 폭 ──────────────────────────────────────────────── */
+.wrap {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 22px 18px 72px;
+}
+
+@media (max-width: 720px) {
+  .topbar { padding: 0 12px; gap: 8px; }
+  .wrap { padding: 16px 12px 56px; }
+  .card { padding: 15px 15px; }
+}
