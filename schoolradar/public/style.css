@@ -87,6 +87,10 @@ html[data-theme="light"] {
 
 html { -webkit-text-size-adjust: 100%; }
 
+/* display 를 주는 규칙(.btn 은 inline-flex, .head 는 flex …)이 브라우저 기본
+   [hidden]{display:none} 를 덮어쓴다. hidden 속성이 언제나 이기게 한다. */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   background: var(--bg);
