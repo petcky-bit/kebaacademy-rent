@@ -3,9 +3,434 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>스쿨레이더</title>
+<title>School Radar — 학교분석보고서 데이터 추출기</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+<script>
+  /* 스타일시트 바로 뒤에서 테마를 먼저 붙인다 —
+     라이트로 쓰던 사람이 새로고침할 때 다크가 한 번 번쩍이지 않게. */
+  try {
+    var t = localStorage.getItem('sr-theme');
+    if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+  } catch (e) {}
+</script>
+<style>
+/* 랜딩 전용. 색은 style.css 의 변수만 쓴다 — 새 색을 만들지 않는다. */
+
+.hero {
+  position: relative;
+  min-height: 100svh;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 48px;
+  padding: 72px 56px;
+  overflow: hidden;
+}
+
+/* 바탕 — --bg 를 중심으로 한 은은한 원형 그라데이션 */
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  z-index: 0;
+  background:
+    radial-gradient(56% 56% at 71% 50%, color-mix(in srgb, var(--accent) 17%, var(--bg)), transparent 72%),
+    radial-gradient(72% 72% at 16% 26%, color-mix(in srgb, var(--lime) 7%, var(--bg)), transparent 76%),
+    var(--bg);
+}
+
+.hero > * { position: relative; z-index: 1; }
+
+/* ── 왼쪽 ─────────────────────────────────────────────────── */
+.lede { max-width: 560px; }
+
+.lede h1 {
+  margin: 0;
+  font-size: clamp(42px, 5.4vw, 70px);
+  font-weight: 700;
+  letter-spacing: -.035em;
+  line-height: 1.02;
+}
+
+.lede .sub {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: clamp(15px, 1.5vw, 17px);
+  letter-spacing: -.01em;
+}
+
+/* 짧은 초록 가로선 */
+.lede .rule {
+  width: 52px;
+  height: 3px;
+  margin: 26px 0;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.lede .claim {
+  margin: 0;
+  font-size: clamp(24px, 2.9vw, 36px);
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: -.025em;
+}
+
+.lede .claim b {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.lede .tag {
+  margin: 16px 0 0;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.lede .go {
+  margin-top: 32px;
+  padding: 12px 28px;
+  font-size: 15.5px;
+}
+
+/* ── 오른쪽 — 레이더 ──────────────────────────────────────── */
+.radar-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.radar {
+  position: relative;
+  /* 점의 거리는 이 반지름에 곱해 쓴다.
+     translateY 의 % 는 자기 자신(0×0) 기준이라 늘 0 이 되므로 길이로 줘야 한다. */
+  --R: min(230px, 39vw);
+  width: min(460px, 78vw);
+  aspect-ratio: 1;
+  border-radius: 50%;
+}
+
+.radar .grid {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.radar .grid circle { stroke: color-mix(in srgb, var(--muted) 17%, transparent); }
+.radar .grid .rim { stroke: color-mix(in srgb, var(--muted) 34%, transparent); }
+.radar .grid .axis { stroke: color-mix(in srgb, var(--muted) 14%, transparent); }
+
+/* 초록 빔 — 4초에 한 바퀴. CSS 애니메이션으로만 돈다. */
+.radar .beam {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  /* 부채꼴은 선행선 뒤로 끌린다 — 빔이 지나간 자리가 남는 것이지 앞서 비추는 게 아니다 */
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    transparent 309deg,
+    color-mix(in srgb, var(--accent) 7%, transparent) 318deg,
+    color-mix(in srgb, var(--accent) 34%, transparent) 352deg,
+    color-mix(in srgb, var(--accent) 50%, transparent) 360deg
+  );
+  -webkit-mask: radial-gradient(circle, #000 0 99.5%, transparent 100%);
+  mask: radial-gradient(circle, #000 0 99.5%, transparent 100%);
+  animation: sr-sweep 4s linear infinite;
+}
+
+/* 빔의 앞날 — 한 줄짜리 밝은 선 */
+.radar .edge {
+  position: absolute;
+  left: 50%;
+  top: 4%;
+  width: 1px;
+  height: 46%;
+  background: linear-gradient(var(--accent), transparent);
+  transform-origin: 50% 100%;
+  animation: sr-sweep 4s linear infinite;
+}
+
+@keyframes sr-sweep {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.radar .core {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin: -3.5px 0 0 -3.5px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* ── 점 ───────────────────────────────────────────────────── */
+/* 각도는 고정, 거리만 바뀐다. 각도를 바꾸면 빔이 지나가지도 않았는데 켜진다. */
+.dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  /* --a 각도(도, 12시에서 시계방향), --d 반지름 대비 거리(0~1) — JS 가 정한다 */
+  transform: rotate(var(--a)) translateY(calc(var(--R) * var(--d) * -1)) rotate(calc(var(--a) * -1));
+  transition: transform .9s cubic-bezier(.3, .7, .3, 1);
+}
+
+/* 가만히 있는 점. 애니메이션이 없어서 절대 재시작하지 않는다. */
+.dot .pip {
+  position: absolute;
+  left: -5px;
+  top: -5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--muted);
+  opacity: .3;
+  cursor: pointer;
+}
+
+/* 빔이 지나갈 때만 켜지는 층.
+   쉬어 가는 바퀴에도 animation 을 끄지 않고 visibility 로만 감춘다 —
+   끄면 다시 켤 때 처음부터 돌아 빔과 어긋난다. */
+.dot .glow {
+  position: absolute;
+  left: -5px;
+  top: -5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0;
+  pointer-events: none;
+  animation: sr-pip 4s linear infinite;
+  animation-delay: var(--delay);
+}
+
+/* 켜진 점을 감싸는 고리 */
+.dot .glow::before {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  border: 1.5px solid var(--accent);
+}
+
+/* 빔이 지나가는 순간의 파문 */
+.dot .glow::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  border: 1px solid var(--accent);
+  opacity: 0;
+  animation: sr-ring 4s linear infinite;
+  animation-delay: var(--delay);
+}
+
+.dot .name {
+  position: absolute;
+  left: 14px;
+  top: -13px;
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--text);
+  font-size: 12.5px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  animation: sr-name 4s linear infinite;
+  animation-delay: var(--delay);
+}
+
+/* 왼쪽 반원의 점은 말풍선을 왼쪽(바깥)으로 */
+.dot.flip .name { left: auto; right: 14px; }
+
+/* 이번 바퀴는 쉬어 가는 점 — 기계처럼 보이지 않게.
+   animation 은 그대로 돌려 두고 보이기만 감춘다. */
+.dot.rest .glow,
+.dot.rest .name { visibility: hidden; }
+
+.dot.rest .pip { opacity: .16; }
+
+/* 빔이 지나가면 켜지고, 다음 바퀴가 올 때까지 켜져 있는다 */
+@keyframes sr-pip {
+  0%, 88% { opacity: 1; }
+  97%     { opacity: 0; }
+  100%    { opacity: 0; }
+}
+
+@keyframes sr-ring {
+  0%   { opacity: .85; transform: scale(.55); }
+  22%  { opacity: 0;   transform: scale(1.5); }
+  100% { opacity: 0;   transform: scale(1.5); }
+}
+
+@keyframes sr-name {
+  0%   { opacity: 0; }
+  5%   { opacity: 1; }
+  88%  { opacity: 1; }
+  97%  { opacity: 0; }
+  100% { opacity: 0; }
+}
+
+.radar-col { display: flex; flex-direction: column; align-items: center; gap: 18px; }
+
+.radar-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+/* ── 좁은 화면 ────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .hero {
+    grid-template-columns: 1fr;
+    gap: 36px;
+    padding: 56px 20px 64px;
+    text-align: left;
+  }
+  .radar-wrap { order: 2; }
+  .lede { order: 1; }
+  .radar { --R: min(190px, 41vw); width: min(380px, 82vw); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .radar .beam,
+  .radar .edge,
+  .dot .glow,
+  .dot .glow::after,
+  .dot .name { animation: none; }
+  .dot .glow { opacity: .9; }
+  .dot .name { opacity: 1; }
+}
+</style>
 </head>
 <body>
-스쿨레이더
+
+<main class="hero">
+  <section class="lede">
+    <h1>School&nbsp;Radar</h1>
+    <p class="sub">학교분석보고서 데이터 추출기</p>
+    <div class="rule"></div>
+    <p class="claim">학교 데이터가<br><b>원장님의 전략</b>이 됩니다.</p>
+    <p class="tag">검색에서 보고서까지, 한 번의 흐름으로.</p>
+    <a class="btn primary go" href="app.html">시작하기</a>
+  </section>
+
+  <section class="radar-wrap">
+    <div class="radar-col">
+    <div class="radar" id="radar">
+      <svg class="grid" viewBox="0 0 200 200" aria-hidden="true">
+        <circle class="rim" cx="100" cy="100" r="99" fill="none" stroke-width="1"/>
+        <circle cx="100" cy="100" r="74" fill="none" stroke-width="1"/>
+        <circle cx="100" cy="100" r="49" fill="none" stroke-width="1"/>
+        <circle cx="100" cy="100" r="24" fill="none" stroke-width="1"/>
+        <path class="axis" d="M100 1V199M1 100H199" stroke-width="1"/>
+        <path class="axis" d="M30 30L170 170M170 30L30 170" stroke-width="1" opacity=".55"/>
+      </svg>
+      <div class="beam"></div>
+      <div class="edge"></div>
+      <div class="core"></div>
+    </div>
+    <p class="radar-note">점을 누르면 그 학교로 갑니다</p>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  /* 레이더 — JS 는 점 배치와 바퀴마다 이름 바꾸기만 한다.
+     회전과 깜빡임은 전부 CSS 애니메이션이다. */
+  var LAP = 4000;
+
+  /* 각도는 고정이다. 바꾸면 빔이 지나가지도 않았는데 점이 켜진다. */
+  var ANGLES = [18, 57, 99, 136, 184, 221, 268, 311];
+
+  var SCHOOLS = [
+    '휘문고등학교', '경기고등학교', '중동고등학교', '세화고등학교',
+    '서울고등학교', '현대고등학교', '숙명여자고등학교', '대원외국어고등학교',
+    '반포고등학교', '영동고등학교', '단대부속고등학교', '한영외국어고등학교'
+  ];
+
+  function short(nm) {
+    return nm
+      .replace('여자고등학교', '여고')
+      .replace('외국어고등학교', '외고')
+      .replace('부속고등학교', '부고')
+      .replace('고등학교', '고');
+  }
+
+  var radar = document.getElementById('radar');
+  var dots = ANGLES.map(function (a) {
+    var el = document.createElement('a');
+    /* 말풍선은 원의 바깥쪽으로 — 왼쪽 반원(6시~12시)이면 왼쪽으로 눕힌다 */
+    el.className = 'dot' + (a > 180 ? ' flip' : '');
+    el.style.setProperty('--a', a + 'deg');
+    /* 빔이 이 각도를 지나는 순간에 맞춰 켜진다.
+       음수 지연이라 빔과 같은 시각 원점을 쓴다. */
+    el.style.setProperty('--delay', (-(LAP - a / 360 * LAP) / 1000).toFixed(3) + 's');
+
+    var pip = document.createElement('span');
+    pip.className = 'pip';
+    var glow = document.createElement('span');
+    glow.className = 'glow';
+    var name = document.createElement('span');
+    name.className = 'name';
+
+    el.appendChild(pip);
+    el.appendChild(glow);
+    el.appendChild(name);
+    radar.appendChild(el);
+    return { el: el, name: name };
+  });
+
+  /* 한 바퀴 안에서는 같은 학교가 두 번 나오지 않게 매번 섞어 쓴다 */
+  function shuffled() {
+    var a = SCHOOLS.slice();
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+
+  function lap() {
+    var bag = shuffled();
+    dots.forEach(function (d, i) {
+      /* 바퀴마다 몇 개는 쉬어 간다 */
+      var rest = Math.random() < 0.28;
+      d.el.classList.toggle('rest', rest);
+      if (rest) return;
+
+      /* 거리만 바꾼다 — 각도는 그대로 */
+      d.el.style.setProperty('--d', (0.34 + Math.random() * 0.60).toFixed(3));
+
+      var nm = bag[i];
+      d.name.textContent = short(nm);
+      d.el.href = 'app.html?school=' + encodeURIComponent(nm);
+      d.el.title = nm;
+    });
+  }
+
+  lap();
+  setInterval(lap, LAP);
+})();
+</script>
 </body>
 </html>
